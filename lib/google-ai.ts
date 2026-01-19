@@ -1,12 +1,32 @@
 /**
- * Service Google AI / Gemini pour la description de photos
- * Utilise Gemini 2.0 Flash pour analyser les images et générer des prompts
+ * Service Google AI / Gemini pour la description et génération de photos
+ * - Description: gemini-3-pro-preview (avec thinking_level: "low")
+ * - Génération: gemini-3-pro-image-preview
  * IMPORTANT: Ne jamais décrire le physique de la personne
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI, ThinkingLevel } from '@google/genai'
+import prisma from './prisma'
 
-const GOOGLE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY
+/**
+ * Récupère la clé API Google AI (depuis env ou Settings)
+ */
+async function getApiKey(): Promise<string | null> {
+  // D'abord vérifier les variables d'environnement
+  if (process.env.GOOGLE_AI_API_KEY) {
+    return process.env.GOOGLE_AI_API_KEY
+  }
+
+  // Sinon chercher dans les Settings
+  try {
+    const setting = await prisma.settings.findUnique({
+      where: { key: 'google_ai_api_key' }
+    })
+    return setting?.value || null
+  } catch {
+    return null
+  }
+}
 
 /**
  * Prompt système pour Gemini - décrit exactement comment générer le prompt
@@ -45,8 +65,9 @@ Tu produis uniquement le prompt, sans commentaire, sans explication, sans introd
 /**
  * Vérifie si la clé API Google AI est configurée
  */
-export function isGoogleAIConfigured(): boolean {
-  return Boolean(GOOGLE_AI_API_KEY && GOOGLE_AI_API_KEY.length > 0)
+export async function isGoogleAIConfigured(): Promise<boolean> {
+  const apiKey = await getApiKey()
+  return Boolean(apiKey && apiKey.length > 0)
 }
 
 /**
@@ -55,7 +76,7 @@ export function isGoogleAIConfigured(): boolean {
 export class GoogleAIError extends Error {
   constructor(
     message: string,
-    public code: 'NOT_CONFIGURED' | 'RATE_LIMIT' | 'INVALID_IMAGE' | 'CONNECTION_ERROR' | 'UNKNOWN'
+    public code: 'NOT_CONFIGURED' | 'RATE_LIMIT' | 'INVALID_IMAGE' | 'CONTENT_BLOCKED' | 'TIMEOUT' | 'CONNECTION_ERROR' | 'GENERATION_FAILED' | 'UNKNOWN'
   ) {
     super(message)
     this.name = 'GoogleAIError'
@@ -63,7 +84,7 @@ export class GoogleAIError extends Error {
 }
 
 /**
- * Génère un prompt de description d'image via Gemini Vision
+ * Génère un prompt de description d'image via Gemini 3 Pro Vision
  * @param imageBuffer - Buffer de l'image à analyser
  * @param mimeType - Type MIME de l'image (ex: 'image/jpeg')
  * @returns Le prompt complet généré par Gemini
@@ -72,36 +93,47 @@ export async function describePhoto(
   imageBuffer: Buffer,
   mimeType: string = 'image/jpeg'
 ): Promise<string> {
-  if (!isGoogleAIConfigured()) {
+  const apiKey = await getApiKey()
+
+  if (!apiKey) {
     throw new GoogleAIError(
-      'Google AI API key is not configured',
+      'Configurez votre clé Google AI dans Settings',
       'NOT_CONFIGURED'
     )
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(GOOGLE_AI_API_KEY!)
-
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp',
-      systemInstruction: SYSTEM_PROMPT,
-    })
+    const ai = new GoogleGenAI({ apiKey })
 
     // Convertir le buffer en base64 pour l'API
     const base64Image = imageBuffer.toString('base64')
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType,
-          data: base64Image,
-        },
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: [
+        {
+          parts: [
+            { text: SYSTEM_PROMPT + '\n\nAnalyse cette image et génère le prompt.' },
+            {
+              inlineData: {
+                mimeType,
+                data: base64Image,
+              }
+            }
+          ]
+        }
+      ],
+      config: {
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.LOW, // Pas besoin de raisonnement complexe pour décrire une image
+        }
       },
-      'Analyse cette image et génère le prompt.',
-    ])
+    })
 
-    const response = result.response
-    const text = response.text()
+    // Extraire le texte de la réponse
+    const text = response.candidates?.[0]?.content?.parts?.find(
+      (part: { text?: string }) => part.text
+    )?.text
 
     if (!text || text.trim().length === 0) {
       throw new GoogleAIError(
@@ -127,6 +159,14 @@ export async function describePhoto(
       )
     }
 
+    // Contenu bloqué
+    if (errorMessage.includes('blocked') || errorMessage.includes('safety') || errorMessage.includes('HARM')) {
+      throw new GoogleAIError(
+        'L\'image a été bloquée par les filtres de sécurité',
+        'CONTENT_BLOCKED'
+      )
+    }
+
     // Erreur de connexion
     if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED')) {
       throw new GoogleAIError(
@@ -149,4 +189,185 @@ export async function describePhoto(
       'UNKNOWN'
     )
   }
+}
+
+/**
+ * Options de configuration pour la génération d'image
+ */
+export interface ImageGenerationConfig {
+  aspectRatio?: '9:16' | '1:1' | '16:9' // Format de l'image
+  imageSize?: '1K' | '2K' | '4K'        // Qualité de l'image
+}
+
+/**
+ * Génère une image via Gemini 3 Pro Image
+ * @param referenceImageBase64 - Image de référence en base64 (le modèle)
+ * @param prompt - Le prompt de génération (doit commencer par "Preserve the identity...")
+ * @param config - Configuration optionnelle (format, qualité)
+ * @returns Buffer de l'image générée
+ */
+export async function generateImageWithGemini(
+  referenceImageBase64: string,
+  prompt: string,
+  config: ImageGenerationConfig = {}
+): Promise<Buffer> {
+  const apiKey = await getApiKey()
+
+  if (!apiKey) {
+    throw new GoogleAIError(
+      'Configurez votre clé Google AI dans Settings',
+      'NOT_CONFIGURED'
+    )
+  }
+
+  // Configuration par défaut
+  const aspectRatio = config.aspectRatio || '9:16'
+  const imageSize = config.imageSize || '2K'
+
+  try {
+    const ai = new GoogleGenAI({ apiKey })
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-image-preview',
+      contents: [
+        {
+          parts: [
+            {
+              inlineData: {
+                mimeType: 'image/jpeg',
+                data: referenceImageBase64,
+              }
+            },
+            {
+              text: prompt // Le prompt commence déjà par "Preserve the identity..."
+            }
+          ]
+        }
+      ],
+      config: {
+        responseModalities: ['image', 'text'],
+        imageConfig: {
+          aspectRatio: aspectRatio,
+          imageSize: imageSize
+        }
+      }
+    })
+
+    // Extraire l'image générée de la réponse
+    const imagePart = response.candidates?.[0]?.content?.parts?.find(
+      (part: { inlineData?: { data?: string } }) => part.inlineData?.data
+    )
+
+    if (!imagePart?.inlineData?.data) {
+      // Vérifier si la réponse contient un message de blocage
+      const textPart = response.candidates?.[0]?.content?.parts?.find(
+        (part: { text?: string }) => part.text
+      )
+      if (textPart?.text) {
+        throw new GoogleAIError(
+          `L'API a refusé de générer l'image: ${textPart.text.substring(0, 100)}`,
+          'CONTENT_BLOCKED'
+        )
+      }
+      throw new GoogleAIError(
+        'Aucune image générée dans la réponse',
+        'GENERATION_FAILED'
+      )
+    }
+
+    return Buffer.from(imagePart.inlineData.data, 'base64')
+  } catch (error) {
+    // Gérer les erreurs spécifiques
+    if (error instanceof GoogleAIError) {
+      throw error
+    }
+
+    const errorMessage = error instanceof Error ? error.message : String(error)
+
+    // Rate limit
+    if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate')) {
+      throw new GoogleAIError(
+        'Trop de requêtes, réessayez dans quelques secondes',
+        'RATE_LIMIT'
+      )
+    }
+
+    // Contenu bloqué
+    if (errorMessage.includes('blocked') || errorMessage.includes('safety') || errorMessage.includes('HARM')) {
+      throw new GoogleAIError(
+        'L\'image a été bloquée par les filtres de sécurité',
+        'CONTENT_BLOCKED'
+      )
+    }
+
+    // Timeout
+    if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
+      throw new GoogleAIError(
+        'La génération prend trop de temps, réessayez',
+        'TIMEOUT'
+      )
+    }
+
+    // Erreur de connexion
+    if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED')) {
+      throw new GoogleAIError(
+        'Erreur de connexion à Google AI',
+        'CONNECTION_ERROR'
+      )
+    }
+
+    // Erreur générique
+    throw new GoogleAIError(
+      `Erreur lors de la génération: ${errorMessage}`,
+      'UNKNOWN'
+    )
+  }
+}
+
+/**
+ * Génère une image via Gemini avec retry automatique pour les erreurs 503/surcharge
+ * @param referenceImageBase64 - Image de référence en base64 (le modèle)
+ * @param prompt - Le prompt de génération
+ * @param config - Configuration optionnelle (format, qualité)
+ * @param maxRetries - Nombre maximum de tentatives (défaut: 3)
+ * @param delayMs - Délai entre les tentatives en ms (défaut: 5000)
+ * @returns Buffer de l'image générée
+ */
+export async function generateImageWithGeminiWithRetry(
+  referenceImageBase64: string,
+  prompt: string,
+  config: ImageGenerationConfig = {},
+  maxRetries: number = 3,
+  delayMs: number = 5000
+): Promise<Buffer> {
+  let lastError: Error | null = null
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Gemini generation attempt ${attempt}/${maxRetries}`)
+      return await generateImageWithGemini(referenceImageBase64, prompt, config)
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      const errorMessage = lastError.message
+
+      // Vérifier si c'est une erreur de surcharge (503, overloaded, etc.)
+      const isOverloaded =
+        errorMessage.includes('503') ||
+        errorMessage.includes('overloaded') ||
+        errorMessage.includes('UNAVAILABLE') ||
+        errorMessage.includes('capacity') ||
+        errorMessage.includes('Service Unavailable')
+
+      if (isOverloaded && attempt < maxRetries) {
+        console.log(`Gemini model overloaded, retrying in ${delayMs / 1000}s...`)
+        await new Promise(resolve => setTimeout(resolve, delayMs))
+        continue
+      }
+
+      // Si ce n'est pas une erreur de surcharge ou c'est la dernière tentative
+      throw error
+    }
+  }
+
+  throw lastError || new Error('Generation failed after retries')
 }

@@ -39,7 +39,7 @@ model SourcePhoto {
   @@index([sourceId])
 }
 
-// Photos générées via Wavespeed img2img
+// Photos générées via Gemini 3 Pro Image ou Wavespeed
 model GeneratedPhoto {
   id            String      @id @default(cuid())
   sourcePhotoId String      // Référence à la photo source

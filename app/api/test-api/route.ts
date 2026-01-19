@@ -3,13 +3,13 @@ import prisma from '@/lib/prisma'
 
 /**
  * POST /api/test-api
- * Teste la connexion à une API (Wavespeed, Google AI, Apify)
+ * Teste la connexion à une API (Google AI, Wavespeed, Apify)
  */
 export async function POST(request: NextRequest) {
   try {
     const { api } = await request.json()
 
-    if (!api || !['wavespeed', 'google_ai', 'apify'].includes(api)) {
+    if (!api || !['google_ai', 'wavespeed', 'apify'].includes(api)) {
       return NextResponse.json(
         { error: 'API invalide' },
         { status: 400 }
@@ -31,10 +31,10 @@ export async function POST(request: NextRequest) {
 
     // Tester selon l'API
     switch (api) {
-      case 'wavespeed':
-        return await testWavespeed(setting.value)
       case 'google_ai':
         return await testGoogleAI(setting.value)
+      case 'wavespeed':
+        return await testWavespeed(setting.value)
       case 'apify':
         return await testApify(setting.value)
       default:
@@ -49,33 +49,6 @@ export async function POST(request: NextRequest) {
       { success: false, error: 'Erreur lors du test' },
       { status: 200 }
     )
-  }
-}
-
-/**
- * Test de la connexion Wavespeed
- */
-async function testWavespeed(apiKey: string) {
-  try {
-    // Test simple avec un endpoint de status ou models
-    const response = await fetch('https://api.wavespeed.ai/api/v2/models', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (response.ok) {
-      return NextResponse.json({ success: true, message: 'Connexion Wavespeed OK' })
-    } else if (response.status === 401) {
-      return NextResponse.json({ success: false, error: 'Clé API invalide' })
-    } else {
-      return NextResponse.json({ success: false, error: `Erreur ${response.status}` })
-    }
-  } catch (error) {
-    console.error('Wavespeed test error:', error)
-    return NextResponse.json({ success: false, error: 'Impossible de contacter Wavespeed' })
   }
 }
 
@@ -100,6 +73,32 @@ async function testGoogleAI(apiKey: string) {
   } catch (error) {
     console.error('Google AI test error:', error)
     return NextResponse.json({ success: false, error: 'Impossible de contacter Google AI' })
+  }
+}
+
+/**
+ * Test de la connexion Wavespeed
+ */
+async function testWavespeed(apiKey: string) {
+  try {
+    // Tester avec l'endpoint des modèles disponibles
+    const response = await fetch('https://api.wavespeed.ai/api/v2/models', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+      }
+    })
+
+    if (response.ok) {
+      return NextResponse.json({ success: true, message: 'Connexion Wavespeed OK' })
+    } else if (response.status === 401 || response.status === 403) {
+      return NextResponse.json({ success: false, error: 'Clé API invalide' })
+    } else {
+      return NextResponse.json({ success: false, error: `Erreur ${response.status}` })
+    }
+  } catch (error) {
+    console.error('Wavespeed test error:', error)
+    return NextResponse.json({ success: false, error: 'Impossible de contacter Wavespeed' })
   }
 }
 

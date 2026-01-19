@@ -17,7 +17,9 @@ import {
   Settings,
   User,
   Key,
-  Zap
+  Zap,
+  ImageIcon,
+  Sparkles
 } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 
@@ -28,16 +30,18 @@ interface ReferencePhoto {
 }
 
 interface ApiStatus {
-  wavespeed: 'idle' | 'testing' | 'success' | 'error'
   google_ai: 'idle' | 'testing' | 'success' | 'error'
+  wavespeed: 'idle' | 'testing' | 'success' | 'error'
   apify: 'idle' | 'testing' | 'success' | 'error'
 }
 
 /**
  * Page de configuration de l'application
  * - Photo de référence du modèle
- * - Clés API (Wavespeed, Google AI, Apify)
- * - Test de connexion aux APIs
+ * - Clé API Google AI (description + génération Gemini 3)
+ * - Clé API Wavespeed (génération alternative)
+ * - Clé API Apify (scraping)
+ * - Options de génération d'image
  */
 export default function SettingsPage() {
   // États pour les settings
@@ -49,15 +53,15 @@ export default function SettingsPage() {
 
   // États pour la visibilité des clés API
   const [showKeys, setShowKeys] = useState({
-    wavespeed: false,
     googleAi: false,
+    wavespeed: false,
     apify: false
   })
 
   // États pour les tests d'API
   const [apiStatus, setApiStatus] = useState<ApiStatus>({
-    wavespeed: 'idle',
     google_ai: 'idle',
+    wavespeed: 'idle',
     apify: 'idle'
   })
 
@@ -65,6 +69,9 @@ export default function SettingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Provider actuel
+  const currentProvider = settings.image_provider || 'gemini'
 
   // Charger les settings au montage
   useEffect(() => {
@@ -179,7 +186,7 @@ export default function SettingsPage() {
   }
 
   // Tester une API
-  const testApi = async (api: 'wavespeed' | 'google_ai' | 'apify') => {
+  const testApi = async (api: 'google_ai' | 'wavespeed' | 'apify') => {
     setApiStatus(prev => ({ ...prev, [api]: 'testing' }))
 
     try {
@@ -198,7 +205,7 @@ export default function SettingsPage() {
         setApiStatus(prev => ({ ...prev, [api]: 'error' }))
         toast.error(data.error || 'Échec de la connexion')
       }
-    } catch (error) {
+    } catch {
       setApiStatus(prev => ({ ...prev, [api]: 'error' }))
       toast.error('Erreur lors du test')
     }
@@ -335,49 +342,6 @@ export default function SettingsPage() {
           </p>
 
           <div className="space-y-6">
-            {/* Wavespeed API Key */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
-                  Wavespeed API Key
-                </label>
-                <ApiStatusIndicator status={apiStatus.wavespeed} />
-              </div>
-              <p className="text-xs text-gray-500">
-                Pour la génération d&apos;images img2img
-              </p>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type={showKeys.wavespeed ? 'text' : 'password'}
-                    value={settings.wavespeed_api_key || ''}
-                    onChange={(e) => updateSetting('wavespeed_api_key', e.target.value)}
-                    placeholder="wsk_..."
-                    className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowKeys(prev => ({ ...prev, wavespeed: !prev.wavespeed }))}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
-                  >
-                    {showKeys.wavespeed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <button
-                  onClick={() => testApi('wavespeed')}
-                  disabled={!settings.wavespeed_api_key || apiStatus.wavespeed === 'testing'}
-                  className="px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-                >
-                  {apiStatus.wavespeed === 'testing' ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Zap className="w-4 h-4" />
-                  )}
-                  Tester
-                </button>
-              </div>
-            </div>
-
             {/* Google AI API Key */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -387,7 +351,7 @@ export default function SettingsPage() {
                 <ApiStatusIndicator status={apiStatus.google_ai} />
               </div>
               <p className="text-xs text-gray-500">
-                Pour la description des photos avec Gemini
+                Pour la description (Gemini 3 Pro) et la génération d&apos;images (Gemini 3 Pro Image)
               </p>
               <div className="flex gap-2">
                 <div className="relative flex-1">
@@ -421,6 +385,54 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {/* Wavespeed API Key */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700">
+                  Wavespeed API Key
+                  {currentProvider === 'wavespeed' && (
+                    <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
+                      Actif
+                    </span>
+                  )}
+                </label>
+                <ApiStatusIndicator status={apiStatus.wavespeed} />
+              </div>
+              <p className="text-xs text-gray-500">
+                Alternative à Gemini pour la génération d&apos;images (google/nano-banana-pro/edit)
+              </p>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showKeys.wavespeed ? 'text' : 'password'}
+                    value={settings.wavespeed_api_key || ''}
+                    onChange={(e) => updateSetting('wavespeed_api_key', e.target.value)}
+                    placeholder="wsk_..."
+                    className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKeys(prev => ({ ...prev, wavespeed: !prev.wavespeed }))}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+                  >
+                    {showKeys.wavespeed ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <button
+                  onClick={() => testApi('wavespeed')}
+                  disabled={!settings.wavespeed_api_key || apiStatus.wavespeed === 'testing'}
+                  className="px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                >
+                  {apiStatus.wavespeed === 'testing' ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Zap className="w-4 h-4" />
+                  )}
+                  Tester
+                </button>
+              </div>
+            </div>
+
             {/* Apify API Key */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -430,7 +442,7 @@ export default function SettingsPage() {
                 <ApiStatusIndicator status={apiStatus.apify} />
               </div>
               <p className="text-xs text-gray-500">
-                Pour le scraping Instagram (optionnel)
+                Pour le scraping Instagram
               </p>
               <div className="flex gap-2">
                 <div className="relative flex-1">
@@ -468,7 +480,7 @@ export default function SettingsPage() {
           {/* Séparateur */}
           <div className="border-t border-gray-200 my-6"></div>
 
-          {/* Section Scraping Configuration */}
+          {/* Section Configuration du scraping */}
           <h3 className="text-md font-medium text-gray-900 mb-4">Configuration du scraping</h3>
           <div className="space-y-4">
             {/* Posts par scrape */}
@@ -489,6 +501,127 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+
+          {/* Séparateur */}
+          <div className="border-t border-gray-200 my-6"></div>
+
+          {/* Section Configuration de génération d'images */}
+          <div className="flex items-center gap-2 mb-4">
+            <ImageIcon className="w-5 h-5 text-gray-600" />
+            <h3 className="text-md font-medium text-gray-900">Configuration de génération</h3>
+          </div>
+
+          {/* Provider de génération */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Provider de génération
+            </label>
+            <p className="text-xs text-gray-500 mb-3">
+              Choisissez le service utilisé pour générer les images. Utilisez Wavespeed en cas de surcharge Gemini.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Option Gemini */}
+              <button
+                onClick={() => updateSetting('image_provider', 'gemini')}
+                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                  currentProvider === 'gemini'
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className={`w-4 h-4 ${currentProvider === 'gemini' ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <span className={`font-medium text-sm ${currentProvider === 'gemini' ? 'text-blue-900' : 'text-gray-700'}`}>
+                    Gemini 3 Pro Image
+                  </span>
+                  {currentProvider === 'gemini' && (
+                    <CheckCircle className="w-4 h-4 text-blue-600 ml-auto" />
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  Recommandé - Retry auto (3x)
+                </p>
+              </button>
+
+              {/* Option Wavespeed */}
+              <button
+                onClick={() => updateSetting('image_provider', 'wavespeed')}
+                className={`p-4 rounded-lg border-2 transition-all text-left ${
+                  currentProvider === 'wavespeed'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap className={`w-4 h-4 ${currentProvider === 'wavespeed' ? 'text-purple-600' : 'text-gray-400'}`} />
+                  <span className={`font-medium text-sm ${currentProvider === 'wavespeed' ? 'text-purple-900' : 'text-gray-700'}`}>
+                    Wavespeed
+                  </span>
+                  {currentProvider === 'wavespeed' && (
+                    <CheckCircle className="w-4 h-4 text-purple-600 ml-auto" />
+                  )}
+                </div>
+                <p className="text-xs text-gray-500">
+                  Alternative - Nano Banana Pro
+                </p>
+              </button>
+            </div>
+          </div>
+
+          {/* Options Gemini uniquement */}
+          {currentProvider === 'gemini' && (
+            <div className="grid grid-cols-2 gap-6 p-4 bg-gray-50 rounded-lg">
+              {/* Format d'image */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Format d&apos;image
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Ratio d&apos;aspect des images générées
+                </p>
+                <select
+                  value={settings.image_aspect_ratio || '9:16'}
+                  onChange={(e) => updateSetting('image_aspect_ratio', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                >
+                  <option value="9:16">9:16 (Portrait - Instagram Stories)</option>
+                  <option value="1:1">1:1 (Carré - Instagram Feed)</option>
+                  <option value="16:9">16:9 (Paysage)</option>
+                </select>
+              </div>
+
+              {/* Qualité d'image */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Qualité d&apos;image
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Résolution des images générées
+                </p>
+                <select
+                  value={settings.image_size || '2K'}
+                  onChange={(e) => updateSetting('image_size', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                >
+                  <option value="1K">1K (Rapide)</option>
+                  <option value="2K">2K (Recommandé)</option>
+                  <option value="4K">4K (Haute qualité)</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Info Wavespeed */}
+          {currentProvider === 'wavespeed' && (
+            <div className="p-4 bg-purple-50 rounded-lg">
+              <p className="text-sm text-purple-700">
+                <strong>Modèle utilisé :</strong> google/nano-banana-pro/edit
+              </p>
+              <p className="text-xs text-purple-600 mt-1">
+                Les options de format et qualité ne sont pas disponibles avec Wavespeed.
+              </p>
+            </div>
+          )}
 
           <div className="mt-6 pt-4 border-t border-gray-100">
             <button

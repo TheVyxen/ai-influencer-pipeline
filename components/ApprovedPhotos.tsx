@@ -92,7 +92,7 @@ export function ApprovedPhotos({ initialPhotos }: ApprovedPhotosProps) {
     }
   }
 
-  // Générer l'image via Wavespeed
+  // Générer l'image via Gemini 3
   const handleGenerate = async (photoId: string) => {
     setLoadingState({ id: photoId, action: 'generate' })
 
@@ -246,7 +246,7 @@ export function ApprovedPhotos({ initialPhotos }: ApprovedPhotosProps) {
           </h2>
         </div>
         <p className="text-xs text-gray-500 mt-1">
-          1. Décrire avec Gemini → 2. Générer avec Wavespeed
+          1. Décrire avec Gemini → 2. Générer avec Gemini
         </p>
 
         {/* Barre d'actions en lot */}

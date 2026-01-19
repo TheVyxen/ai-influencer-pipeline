@@ -1,18 +1,12 @@
 /**
  * Service Wavespeed pour la génération img2img
- * Utilise une photo de référence + prompt pour générer de nouvelles images
+ * Modèle : google/nano-banana-pro/edit
+ * Alternative à Gemini en cas de surcharge
  */
 
-import { readFile, writeFile, access } from 'fs/promises'
-import path from 'path'
 import prisma from './prisma'
-import { removeExifFromBuffer } from './exif-remover'
 
-// Chemins possibles pour la photo de référence
-const REFERENCE_PATHS = [
-  path.join(process.cwd(), 'public', 'reference', 'model.jpg'),
-  path.join(process.cwd(), 'public', 'reference', 'model.png'),
-]
+const WAVESPEED_API_URL = 'https://api.wavespeed.ai/api/v3/wavespeed-ai/google/nano-banana-pro/edit'
 
 /**
  * Types d'erreurs possibles
@@ -20,7 +14,7 @@ const REFERENCE_PATHS = [
 export class WavespeedError extends Error {
   constructor(
     message: string,
-    public code: 'NOT_CONFIGURED' | 'NO_REFERENCE' | 'API_ERROR' | 'TIMEOUT' | 'GENERATION_FAILED' | 'UNKNOWN'
+    public code: 'NOT_CONFIGURED' | 'RATE_LIMIT' | 'API_ERROR' | 'TIMEOUT' | 'GENERATION_FAILED' | 'UNKNOWN'
   ) {
     super(message)
     this.name = 'WavespeedError'
@@ -56,83 +50,56 @@ export async function isWavespeedConfigured(): Promise<boolean> {
 }
 
 /**
- * Trouve et retourne le chemin de la photo de référence
- */
-export async function getReferencePhotoPath(): Promise<string | null> {
-  for (const refPath of REFERENCE_PATHS) {
-    try {
-      await access(refPath)
-      return refPath
-    } catch {
-      // Fichier n'existe pas, continuer
-    }
-  }
-  return null
-}
-
-/**
- * Résultat de la génération
- */
-export interface GenerationResult {
-  success: boolean
-  localPath?: string
-  error?: string
-}
-
-/**
- * Génère une image via Wavespeed API
- * @param referenceImageBuffer - Buffer de l'image de référence (modèle)
+ * Génère une image via Wavespeed API (google/nano-banana-pro/edit)
+ * @param referenceImageBase64 - Image de référence en base64 (le modèle)
  * @param prompt - Le prompt de génération
- * @param sourcePhotoId - ID de la photo source (pour le nom du fichier)
- * @returns Résultat avec le chemin de l'image générée
+ * @returns Buffer de l'image générée
  */
-export async function generateImage(
-  referenceImageBuffer: Buffer,
-  prompt: string,
-  sourcePhotoId: string
-): Promise<GenerationResult> {
+export async function generateImageWithWavespeed(
+  referenceImageBase64: string,
+  prompt: string
+): Promise<Buffer> {
   const apiKey = await getApiKey()
 
   if (!apiKey) {
     throw new WavespeedError(
-      'Wavespeed API key is not configured',
+      'Configurez votre clé Wavespeed API dans Settings',
       'NOT_CONFIGURED'
     )
   }
 
   try {
-    // Convertir l'image de référence en base64
-    const base64Image = referenceImageBuffer.toString('base64')
+    console.log('Wavespeed generation starting...')
 
-    // Appeler l'API Wavespeed
-    // Note: Cette implémentation utilise un format d'API standard
-    // Ajustez l'URL et les paramètres selon la documentation Wavespeed
-    const response = await fetch('https://api.wavespeed.ai/api/v2/wavespeed-ai/pulid/generate', {
+    const response = await fetch(WAVESPEED_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        // Image de référence en base64
-        main_face_image: `data:image/jpeg;base64,${base64Image}`,
+        // Image de référence en base64 avec préfixe data URI
+        image: `data:image/jpeg;base64,${referenceImageBase64}`,
         // Prompt de génération
         prompt: prompt,
-        // Paramètres de génération
-        num_steps: 4,
-        guidance_scale: 1.2,
+        // Paramètres optionnels pour le modèle nano-banana-pro
         seed: Math.floor(Math.random() * 1000000),
-        // enable_safety_checker: false,
-      }),
+      })
     })
 
     if (!response.ok) {
       const errorText = await response.text()
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { message: errorText }
+      }
 
       if (response.status === 429) {
         throw new WavespeedError(
-          'Trop de requêtes, réessayez dans quelques secondes',
-          'API_ERROR'
+          'Trop de requêtes Wavespeed, réessayez dans quelques secondes',
+          'RATE_LIMIT'
         )
       }
 
@@ -144,58 +111,71 @@ export async function generateImage(
       }
 
       throw new WavespeedError(
-        `Erreur Wavespeed: ${errorText}`,
+        `Erreur Wavespeed: ${errorData.message || errorData.error || JSON.stringify(errorData)}`,
         'API_ERROR'
       )
     }
 
     const result = await response.json()
 
-    // Wavespeed retourne généralement une URL ou une image en base64
-    // Adapter selon leur format de réponse réel
-    let imageData: Buffer
+    // Extraire l'image selon le format de réponse Wavespeed
+    // Le format peut varier selon l'API, on gère plusieurs cas
+    let imageBase64: string | null = null
 
     if (result.data?.output?.[0]) {
-      // Si l'API retourne une URL
+      // Format avec URL - télécharger l'image
       const imageUrl = result.data.output[0]
+      console.log('Wavespeed returned URL, downloading...')
       const imageResponse = await fetch(imageUrl)
+      if (!imageResponse.ok) {
+        throw new WavespeedError(
+          'Impossible de télécharger l\'image générée',
+          'GENERATION_FAILED'
+        )
+      }
       const arrayBuffer = await imageResponse.arrayBuffer()
-      imageData = Buffer.from(arrayBuffer)
-    } else if (result.image || result.output) {
-      // Si l'API retourne directement en base64
-      const base64Data = (result.image || result.output).replace(/^data:image\/\w+;base64,/, '')
-      imageData = Buffer.from(base64Data, 'base64')
-    } else {
+      return Buffer.from(arrayBuffer)
+    } else if (result.image) {
+      // Format avec image en base64 directement
+      imageBase64 = result.image.replace(/^data:image\/\w+;base64,/, '')
+    } else if (result.output) {
+      // Autre format possible
+      imageBase64 = result.output.replace(/^data:image\/\w+;base64,/, '')
+    } else if (result.result) {
+      // Encore un autre format
+      imageBase64 = result.result.replace(/^data:image\/\w+;base64,/, '')
+    }
+
+    if (!imageBase64) {
+      console.error('Wavespeed response format:', JSON.stringify(result).substring(0, 500))
       throw new WavespeedError(
         'Format de réponse Wavespeed inattendu',
         'GENERATION_FAILED'
       )
     }
 
-    // Générer le nom du fichier
-    const timestamp = Date.now()
-    const fileName = `generated_${sourcePhotoId}_${timestamp}.jpg`
-    const outputPath = path.join(process.cwd(), 'public', 'generated', fileName)
-
-    // Supprimer les métadonnées EXIF de l'image avant sauvegarde
-    const cleanImageData = await removeExifFromBuffer(imageData)
-    await writeFile(outputPath, cleanImageData)
-
-    return {
-      success: true,
-      localPath: `/generated/${fileName}`,
-    }
+    console.log('Wavespeed generation completed successfully')
+    return Buffer.from(imageBase64, 'base64')
   } catch (error) {
+    // Gérer les erreurs spécifiques
     if (error instanceof WavespeedError) {
       throw error
     }
 
     const errorMessage = error instanceof Error ? error.message : String(error)
 
+    // Rate limit
+    if (errorMessage.includes('429') || errorMessage.includes('rate')) {
+      throw new WavespeedError(
+        'Trop de requêtes Wavespeed, réessayez dans quelques secondes',
+        'RATE_LIMIT'
+      )
+    }
+
     // Timeout
     if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
       throw new WavespeedError(
-        'La génération prend trop de temps, réessayez',
+        'La génération Wavespeed prend trop de temps, réessayez',
         'TIMEOUT'
       )
     }
@@ -208,8 +188,9 @@ export async function generateImage(
       )
     }
 
+    // Erreur générique
     throw new WavespeedError(
-      `Erreur lors de la génération: ${errorMessage}`,
+      `Erreur lors de la génération Wavespeed: ${errorMessage}`,
       'UNKNOWN'
     )
   }

@@ -18,8 +18,27 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
 - **UI** : lucide-react (icônes), react-hot-toast (notifications)
 - **APIs externes** :
   - Apify (scraping Instagram)
-  - Google AI / Gemini (description de photos)
-  - Wavespeed (génération img2img)
+  - Google AI / Gemini 3 (description + génération d'images)
+  - Wavespeed (génération d'images alternative)
+
+## Providers de génération d'images
+
+### Gemini 3 Pro Image (recommandé)
+- **Modèle** : `gemini-3-pro-image-preview`
+- **Description** : `gemini-3-pro-preview` (avec thinkingLevel: "low")
+- **Retry automatique** : 3 tentatives avec 5s de délai pour les erreurs 503
+- **Options** : format (9:16, 1:1, 16:9), qualité (1K, 2K, 4K)
+
+### Wavespeed (alternative)
+- **Modèle** : `google/nano-banana-pro/edit`
+- **Utilisation** : En cas de surcharge Gemini (erreur 503)
+- **Bascule** : Manuelle dans Settings > Provider de génération
+
+### Comment basculer entre les providers
+1. Aller dans Settings
+2. Section "Configuration de génération"
+3. Cliquer sur le provider souhaité (Gemini ou Wavespeed)
+4. Sauvegarder les paramètres
 
 ## Packages installés
 ```json
@@ -29,7 +48,7 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
     "react": "18.3.1",
     "prisma": "5.22.0",
     "@prisma/client": "5.22.0",
-    "@google/generative-ai": "0.24.1",
+    "@google/genai": "latest",
     "apify-client": "2.21.0",
     "sharp": "0.34.5",
     "archiver": "7.0.1",
@@ -43,14 +62,14 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
 ```
 /app
   /page.tsx                    # Dashboard principal avec StatsBar
-  /settings/page.tsx           # Configuration avec test API
+  /settings/page.tsx           # Configuration avec test API + provider
   /api/
     /sources/                  # CRUD sources Instagram
     /photos/                   # Gestion photos (approve, reject, describe, generate)
     /scrape/                   # Scraping Instagram
     /settings/                 # Clés API
     /reference/                # Photo de référence
-    /test-api/                 # Test connexion APIs
+    /test-api/                 # Test connexion APIs (Google AI, Wavespeed, Apify)
     /health/                   # Health check
 /components
   /ui/
@@ -69,8 +88,8 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
   /prisma.ts                   # Client Prisma
   /utils.ts                    # Fonctions utilitaires
   /apify.ts                    # Service Apify
-  /google-ai.ts                # Service Google AI
-  /wavespeed.ts                # Service Wavespeed
+  /google-ai.ts                # Service Google AI (description + génération Gemini)
+  /wavespeed.ts                # Service Wavespeed (génération alternative)
   /exif-remover.ts             # Suppression EXIF
 /prisma
   /schema.prisma               # Schéma BDD
@@ -83,8 +102,17 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
 ## Modèles de données (Prisma)
 - **Source** : Comptes Instagram à scraper (username)
 - **SourcePhoto** : Photos scrapées (status: pending/approved/rejected)
-- **GeneratedPhoto** : Photos générées (avec prompt utilisé)
-- **Settings** : Configuration (clés API, photo référence)
+- **GeneratedPhoto** : Photos générées via Gemini 3 ou Wavespeed (avec prompt utilisé)
+- **Settings** : Configuration (clés API, photo référence, options génération)
+
+## Settings stockés
+- `google_ai_api_key` : Clé API Google AI
+- `wavespeed_api_key` : Clé API Wavespeed (optionnel)
+- `apify_api_key` : Clé API Apify
+- `posts_per_scrape` : Nombre de posts par scrape (défaut: 10)
+- `image_provider` : Provider de génération (gemini, wavespeed) - défaut: gemini
+- `image_aspect_ratio` : Format d'image (9:16, 1:1, 16:9) - défaut: 9:16
+- `image_size` : Qualité d'image (1K, 2K, 4K) - défaut: 2K
 
 ## Fonctionnalités UX
 
@@ -118,9 +146,11 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
 - Dernière activité
 
 ### Page Settings améliorée
-- Bouton "Tester" pour chaque API
+- Bouton "Tester" pour chaque API (Google AI, Wavespeed, Apify)
 - Indicateur visuel du statut (vert/rouge)
 - Modal de confirmation pour supprimer la photo de référence
+- **Sélecteur de provider** : Gemini 3 ou Wavespeed
+- Sélecteurs pour le format et la qualité des images (Gemini uniquement)
 
 ## Règles de code
 1. Toujours commenter les fonctions complexes
@@ -137,7 +167,7 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
 DATABASE_URL="file:./dev.db"
 APIFY_API_KEY=""
 GOOGLE_AI_API_KEY=""
-WAVESPEED_API_KEY=""
+WAVESPEED_API_KEY=""  # Optionnel, requis si provider=wavespeed
 ```
 
 ## Logique métier importante
@@ -158,7 +188,13 @@ Le prompt ne décrit JAMAIS le physique de la personne (visage, corps, etc.)
 ### Photo de référence
 - Une seule photo de référence pour la modèle
 - Stockée dans /public/reference/model.jpg
-- Envoyée avec chaque génération Wavespeed comme image d'entrée
+- Envoyée avec chaque génération (Gemini ou Wavespeed) comme image d'entrée
+
+### Configuration de génération
+- **Provider** : Gemini (défaut) ou Wavespeed
+- **Format (aspectRatio)** : 9:16 (portrait), 1:1 (carré), 16:9 (paysage) - Gemini uniquement
+- **Qualité (imageSize)** : 1K (rapide), 2K (recommandé), 4K (haute qualité) - Gemini uniquement
+- Ces paramètres sont configurables dans la page Settings
 
 ### Workflow de validation
 1. Photos scrapées arrivent en status "pending"
@@ -166,11 +202,31 @@ Le prompt ne décrit JAMAIS le physique de la personne (visage, corps, etc.)
 3. Seules les "approved" passent à la génération
 4. Après génération, suppression des métadonnées EXIF
 
+## Gestion d'erreurs
+
+### Erreurs Gemini
+- **NOT_CONFIGURED** : Clé API non configurée
+- **RATE_LIMIT** : Trop de requêtes (429)
+- **CONTENT_BLOCKED** : Contenu refusé par les filtres de sécurité
+- **TIMEOUT** : Génération trop longue
+- **INVALID_IMAGE** : Image non analysable
+- **GENERATION_FAILED** : Échec de génération
+- **503/Overloaded** : Retry automatique (3x), sinon suggestion de basculer sur Wavespeed
+
+### Erreurs Wavespeed
+- **NOT_CONFIGURED** : Clé API non configurée
+- **RATE_LIMIT** : Trop de requêtes (429)
+- **API_ERROR** : Erreur de l'API Wavespeed
+- **TIMEOUT** : Génération trop longue
+- **GENERATION_FAILED** : Échec de génération
+
 ## Points d'attention
 - Ne jamais exposer les clés API côté client
 - Toujours supprimer les EXIF avant stockage final
 - Les images scrapées sont temporaires (supprimer après génération)
 - Rate limiting sur les APIs (gérer les erreurs 429)
+- Les filtres de sécurité Gemini peuvent bloquer certains contenus
+- **En cas de surcharge Gemini (503)** : basculer manuellement sur Wavespeed
 
 ## Commandes utiles
 ```bash

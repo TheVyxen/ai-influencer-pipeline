@@ -25,7 +25,7 @@ interface GeneratedGalleryProps {
 }
 
 /**
- * Section des photos générées via Wavespeed
+ * Section des photos générées via Gemini 3
  */
 export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProps) {
   const [photos, setPhotos] = useState<GeneratedPhoto[]>(initialPhotos)
@@ -181,7 +181,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                   )}
                 </h2>
                 <p className="text-xs text-gray-500">
-                  Images générées par Wavespeed
+                  Images générées par Gemini
                 </p>
               </div>
             </div>
