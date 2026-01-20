@@ -1,12 +1,12 @@
 // Prisma Schema for AI Influencer Photo Pipeline
-// Database: SQLite (local development)
+// Database: PostgreSQL (Neon - production ready)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

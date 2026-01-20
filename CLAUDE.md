@@ -13,7 +13,7 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
 - **Framework** : Next.js 14 (App Router)
 - **Langage** : TypeScript
 - **Style** : Tailwind CSS
-- **BDD** : SQLite avec Prisma ORM
+- **BDD** : PostgreSQL (Neon) avec Prisma ORM
 - **Stockage** : Local (/public/uploads) puis Cloudflare R2
 - **UI** : lucide-react (icônes), react-hot-toast (notifications)
 - **APIs externes** :
@@ -166,7 +166,7 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
 
 ## Variables d'environnement requises
 ```
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://user:password@host/database?sslmode=require"  # Neon PostgreSQL
 APIFY_API_KEY=""
 GOOGLE_AI_API_KEY=""
 WAVESPEED_API_KEY=""       # Optionnel, requis si provider=wavespeed
