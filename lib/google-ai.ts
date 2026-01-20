@@ -316,31 +316,25 @@ Produis UNIQUEMENT le prompt, sans commentaire ni explication.`
 
     // ========== APPEL 2 : Images suivantes (uniquement les poses) ==========
 
-    const remainingImagesPrompt = `Tu es un expert en prompt engineering pour la génération d'images photo-réalistes.
+    const remainingImagesPrompt = `Analyse ces images qui font partie d'un carrousel (même scène, poses différentes).
 
-CONTEXTE : Voici le prompt complet de la PREMIÈRE image d'un carrousel :
-"""
-${firstPrompt}
-"""
+Pour CHAQUE image, génère un prompt TRÈS COURT qui décrit UNIQUEMENT le changement de pose par rapport à la première image.
 
-TÂCHE : Pour chaque image suivante que je te donne, génère un prompt COURT qui :
-1. Garde TOUT identique (environnement, éclairage, vêtements, accessoires, angle)
-2. Change UNIQUEMENT la position/pose du corps
+FORMAT EXACT à utiliser pour chaque prompt :
+"Preserve the identity of the person from the input image. Same scene, same outfit, same lighting. Only change: [POSE EN 1 PHRASE]."
 
-FORMAT OBLIGATOIRE pour chaque prompt :
-"Preserve the identity of the person from the input image. Maintain the exact same environment, lighting, outfit, accessories, and camera angle from the first image. Everything remains identical except the pose.
-
-New pose: [DÉCRIS LA NOUVELLE POSE EN 1-2 PHRASES].
-
-Same setting, same lighting, same outfit. Ultra-realistic."
+EXEMPLES :
+- "Preserve the identity of the person from the input image. Same scene, same outfit, same lighting. Only change: now facing camera with hands on hips."
+- "Preserve the identity of the person from the input image. Same scene, same outfit, same lighting. Only change: sitting with legs crossed, leaning back."
+- "Preserve the identity of the person from the input image. Same scene, same outfit, same lighting. Only change: standing in profile view, looking left."
 
 RÈGLES :
-- Chaque prompt fait MAXIMUM 6 lignes
-- Ne JAMAIS re-décrire le décor, les vêtements, ou l'éclairage
-- Sépare chaque prompt par "---NEXT---" sur une ligne seule
-- Produis UNIQUEMENT les prompts, sans commentaire
+- Maximum 2 lignes par prompt
+- Ne décrire QUE la pose
+- Sépare chaque prompt par "---NEXT---"
+- Aucun commentaire, juste les prompts
 
-Je t'envoie ${imageBuffers.length - 1} image(s). Génère un prompt pour chacune.`
+Je t'envoie ${imageBuffers.length - 1} image(s).`
 
     const remainingImageParts = imageBuffers.slice(1).map(buffer => ({
       inlineData: {
