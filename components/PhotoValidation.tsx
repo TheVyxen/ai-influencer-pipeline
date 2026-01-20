@@ -822,13 +822,13 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
       {/* Modal d'aperçu d'image (plein écran) */}
       {previewModal.isOpen && previewModal.imageUrl && (
         <div
-          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
           onClick={() => setPreviewModal({ isOpen: false, imageUrl: null, allImages: [], currentIndex: 0 })}
         >
           {/* Bouton fermer */}
           <button
             onClick={() => setPreviewModal({ isOpen: false, imageUrl: null, allImages: [], currentIndex: 0 })}
-            className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 rounded-full p-2 transition-colors z-10"
+            className="absolute top-4 right-4 z-[101] bg-white/20 hover:bg-white/40 rounded-full p-2 transition"
           >
             <X className="w-6 h-6 text-white" />
           </button>
@@ -840,31 +840,20 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                 e.stopPropagation()
                 navigatePreview('prev')
               }}
-              className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 rounded-full p-2 transition-colors z-10"
+              className="absolute left-4 top-1/2 -translate-y-1/2 z-[101] bg-white/20 hover:bg-white/40 rounded-full p-2 transition"
             >
               <ChevronLeft className="w-8 h-8 text-white" />
             </button>
           )}
 
-          {/* Image */}
-          <div
-            className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center"
+          {/* Image - structure simplifiée */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={previewModal.imageUrl}
+            alt="Aperçu"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={previewModal.imageUrl}
-              alt="Aperçu"
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
-            />
-
-            {/* Indicateur de position */}
-            {previewModal.allImages.length > 1 && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1.5 rounded-full">
-                {previewModal.currentIndex + 1} / {previewModal.allImages.length}
-              </div>
-            )}
-          </div>
+          />
 
           {/* Navigation suivant */}
           {previewModal.allImages.length > 1 && (
@@ -873,10 +862,17 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                 e.stopPropagation()
                 navigatePreview('next')
               }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 rounded-full p-2 transition-colors z-10"
+              className="absolute right-4 top-1/2 -translate-y-1/2 z-[101] bg-white/20 hover:bg-white/40 rounded-full p-2 transition"
             >
               <ChevronRight className="w-8 h-8 text-white" />
             </button>
+          )}
+
+          {/* Indicateur de position */}
+          {previewModal.allImages.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1.5 rounded-full">
+              {previewModal.currentIndex + 1} / {previewModal.allImages.length}
+            </div>
           )}
 
           {/* Aide clavier */}
