@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createReadStream } from 'fs'
-import { access } from 'fs/promises'
-import path from 'path'
 import archiver from 'archiver'
 import prisma from '@/lib/prisma'
 
@@ -9,6 +6,7 @@ import prisma from '@/lib/prisma'
  * POST /api/photos/generated/download-all
  * Crée un ZIP avec les photos sélectionnées
  * Body: { ids: string[] }
+ * Compatible Vercel (lit depuis la base de données)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -36,21 +34,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Vérifier que tous les fichiers existent
-    const validPhotos: typeof photos = []
-    for (const photo of photos) {
-      const absolutePath = path.join(process.cwd(), 'public', photo.localPath)
-      try {
-        await access(absolutePath)
-        validPhotos.push(photo)
-      } catch {
-        console.warn(`File not found: ${absolutePath}`)
-      }
-    }
+    // Filtrer les photos qui ont des données d'image
+    const validPhotos = photos.filter(p => p.imageData)
 
     if (validPhotos.length === 0) {
       return NextResponse.json(
-        { error: 'No valid files found' },
+        { error: 'No valid photos found' },
         { status: 404 }
       )
     }
@@ -77,9 +66,19 @@ export async function POST(request: NextRequest) {
 
       // Ajouter chaque photo au ZIP
       for (const photo of validPhotos) {
-        const absolutePath = path.join(process.cwd(), 'public', photo.localPath)
+        // Extraire le base64 pur si c'est un data URL
+        let base64Data = photo.imageData!
+        if (base64Data.startsWith('data:')) {
+          const matches = base64Data.match(/^data:[^;]+;base64,(.+)$/)
+          if (matches) {
+            base64Data = matches[1]
+          }
+        }
+
+        // Convertir en buffer
+        const imageBuffer = Buffer.from(base64Data, 'base64')
         const fileName = `photo_generated_${photo.id}.jpg`
-        archive.append(createReadStream(absolutePath), { name: fileName })
+        archive.append(imageBuffer, { name: fileName })
       }
 
       // Finaliser le ZIP

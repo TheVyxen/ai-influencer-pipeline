@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
 import toast from 'react-hot-toast'
 import { Sparkles, Eye, Download, Copy, X, Check, Trash2 } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
@@ -10,7 +9,7 @@ import { ConfirmModal } from './ui/ConfirmModal'
 interface GeneratedPhoto {
   id: string
   prompt: string
-  localPath: string
+  localPath: string | null
   createdAt: string
   sourcePhoto: {
     id: string
@@ -276,12 +275,11 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                       </span>
                     </div>
 
-                    <Image
-                      src={photo.localPath}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={photo.localPath || `/api/images/generated/${photo.id}`}
                       alt="Photo générée"
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 50vw, 200px"
+                      className="absolute inset-0 w-full h-full object-cover"
                     />
                   </div>
                   <div className="p-3">

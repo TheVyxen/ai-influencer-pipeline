@@ -1,39 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, unlink, access } from 'fs/promises'
-import path from 'path'
-
-const REFERENCE_DIR = path.join(process.cwd(), 'public', 'reference')
-const REFERENCE_PATH_JPG = path.join(REFERENCE_DIR, 'model.jpg')
-const REFERENCE_PATH_PNG = path.join(REFERENCE_DIR, 'model.png')
+import prisma from '@/lib/prisma'
 
 /**
  * GET /api/reference
- * Vérifie si une photo de référence existe
+ * Vérifie si une photo de référence existe dans la base de données
  */
 export async function GET() {
   try {
-    // Vérifier si le fichier jpg existe
-    try {
-      await access(REFERENCE_PATH_JPG)
-      return NextResponse.json({
-        exists: true,
-        path: '/reference/model.jpg',
-        format: 'jpg'
-      })
-    } catch {
-      // Pas de jpg, vérifier png
-    }
+    // Vérifier si l'image de référence existe dans Settings
+    const setting = await prisma.settings.findUnique({
+      where: { key: 'reference_photo_base64' }
+    })
 
-    // Vérifier si le fichier png existe
-    try {
-      await access(REFERENCE_PATH_PNG)
+    if (setting?.value) {
+      // Récupérer le format depuis Settings (optionnel)
+      const formatSetting = await prisma.settings.findUnique({
+        where: { key: 'reference_photo_format' }
+      })
+
       return NextResponse.json({
         exists: true,
-        path: '/reference/model.png',
-        format: 'png'
+        path: '/api/images/reference', // URL pour accéder à l'image
+        format: formatSetting?.value || 'jpg'
       })
-    } catch {
-      // Pas de png non plus
     }
 
     return NextResponse.json({
@@ -52,7 +41,7 @@ export async function GET() {
 
 /**
  * POST /api/reference
- * Upload de la photo de référence du modèle
+ * Upload de la photo de référence du modèle (stockée en base64 dans Settings)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -75,30 +64,42 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Vérifier la taille du fichier (max 5MB pour éviter les problèmes de base de données)
+    const maxSize = 5 * 1024 * 1024 // 5MB
+    if (file.size > maxSize) {
+      return NextResponse.json(
+        { error: 'File too large. Maximum size is 5MB.' },
+        { status: 400 }
+      )
+    }
+
     // Déterminer l'extension
     const isJpg = file.type === 'image/jpeg' || file.type === 'image/jpg'
     const ext = isJpg ? 'jpg' : 'png'
-    const filePath = path.join(REFERENCE_DIR, `model.${ext}`)
+    const mimeType = isJpg ? 'image/jpeg' : 'image/png'
 
-    // Supprimer l'ancien fichier s'il existe (autre format)
-    try {
-      if (isJpg) {
-        await unlink(REFERENCE_PATH_PNG)
-      } else {
-        await unlink(REFERENCE_PATH_JPG)
-      }
-    } catch {
-      // Fichier n'existe pas, c'est ok
-    }
-
-    // Sauvegarder le nouveau fichier
+    // Convertir le fichier en base64
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
+    const base64Data = `data:${mimeType};base64,${buffer.toString('base64')}`
+
+    // Sauvegarder dans Settings (upsert)
+    await prisma.settings.upsert({
+      where: { key: 'reference_photo_base64' },
+      update: { value: base64Data },
+      create: { key: 'reference_photo_base64', value: base64Data }
+    })
+
+    // Sauvegarder le format
+    await prisma.settings.upsert({
+      where: { key: 'reference_photo_format' },
+      update: { value: ext },
+      create: { key: 'reference_photo_format', value: ext }
+    })
 
     return NextResponse.json({
       success: true,
-      path: `/reference/model.${ext}`,
+      path: '/api/images/reference',
       format: ext
     })
   } catch (error) {
@@ -112,22 +113,18 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE /api/reference
- * Supprime la photo de référence
+ * Supprime la photo de référence de la base de données
  */
 export async function DELETE() {
   try {
-    // Essayer de supprimer les deux formats
-    try {
-      await unlink(REFERENCE_PATH_JPG)
-    } catch {
-      // Fichier n'existe pas
-    }
-
-    try {
-      await unlink(REFERENCE_PATH_PNG)
-    } catch {
-      // Fichier n'existe pas
-    }
+    // Supprimer l'image de référence et son format
+    await prisma.settings.deleteMany({
+      where: {
+        key: {
+          in: ['reference_photo_base64', 'reference_photo_format']
+        }
+      }
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

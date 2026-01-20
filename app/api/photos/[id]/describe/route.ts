@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFile } from 'fs/promises'
-import path from 'path'
 import prisma from '@/lib/prisma'
 import { describePhoto, GoogleAIError } from '@/lib/google-ai'
 
 /**
+ * Télécharge une image depuis une URL et retourne le buffer
+ */
+async function downloadImageFromUrl(url: string): Promise<Buffer> {
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error(`Failed to download image: ${response.status}`)
+  }
+
+  const arrayBuffer = await response.arrayBuffer()
+  return Buffer.from(arrayBuffer)
+}
+
+/**
  * POST /api/photos/[id]/describe
  * Génère un prompt de description via Google AI Gemini
+ * Télécharge l'image depuis originalUrl (compatible Vercel serverless)
  */
 export async function POST(
   request: NextRequest,
@@ -35,37 +48,36 @@ export async function POST(
       )
     }
 
-    // Vérifier qu'on a un chemin local
-    if (!photo.localPath) {
+    // Vérifier qu'on a une URL originale
+    if (!photo.originalUrl) {
       return NextResponse.json(
-        { error: 'Photo file not found' },
+        { error: 'Photo URL not found' },
         { status: 400 }
       )
     }
 
-    // Charger l'image depuis le système de fichiers
-    const imagePath = path.join(process.cwd(), 'public', photo.localPath)
+    // Télécharger l'image depuis l'URL originale (Instagram)
     let imageBuffer: Buffer
-
     try {
-      imageBuffer = await readFile(imagePath)
-    } catch {
+      imageBuffer = await downloadImageFromUrl(photo.originalUrl)
+    } catch (error) {
+      console.error('Error downloading image from URL:', error)
       return NextResponse.json(
-        { error: 'Unable to read image file' },
+        { error: 'Unable to download image from source URL' },
         { status: 500 }
       )
     }
 
-    // Déterminer le type MIME
-    const ext = path.extname(photo.localPath).toLowerCase()
-    const mimeTypes: Record<string, string> = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
+    // Déterminer le type MIME depuis l'URL ou utiliser jpeg par défaut
+    const url = photo.originalUrl.toLowerCase()
+    let mimeType = 'image/jpeg'
+    if (url.includes('.png')) {
+      mimeType = 'image/png'
+    } else if (url.includes('.webp')) {
+      mimeType = 'image/webp'
+    } else if (url.includes('.gif')) {
+      mimeType = 'image/gif'
     }
-    const mimeType = mimeTypes[ext] || 'image/jpeg'
 
     // Appeler Google AI pour générer le prompt
     const generatedPrompt = await describePhoto(imageBuffer, mimeType)

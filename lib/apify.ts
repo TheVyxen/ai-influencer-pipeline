@@ -1,13 +1,13 @@
 /**
  * Service Apify pour le scraping Instagram
  * Documentation: https://apify.com/apify/instagram-scraper
+ *
+ * NOTE: Les images ne sont plus téléchargées localement (compatible Vercel serverless)
+ * On utilise directement les URLs Instagram (originalUrl)
  */
 
 import { ApifyClient } from 'apify-client'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
 import prisma from './prisma'
-import { removeExifFromBuffer } from './exif-remover'
 
 /**
  * Structure d'une photo Instagram scrapée par Apify
@@ -217,38 +217,9 @@ export async function scrapeMultipleProfiles(
 }
 
 /**
- * Télécharge une image depuis une URL et la sauvegarde localement
- * @param imageUrl - URL de l'image à télécharger
- * @param filename - Nom du fichier (sans chemin)
- * @returns Chemin local relatif
- */
-async function downloadImage(imageUrl: string, filename: string): Promise<string> {
-  const response = await fetch(imageUrl)
-
-  if (!response.ok) {
-    throw new Error(`Failed to download image: ${response.status}`)
-  }
-
-  const arrayBuffer = await response.arrayBuffer()
-  const imageBuffer = Buffer.from(arrayBuffer)
-
-  // Supprimer les métadonnées EXIF
-  const cleanBuffer = await removeExifFromBuffer(imageBuffer)
-
-  // S'assurer que le dossier uploads existe
-  const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
-  await mkdir(uploadsDir, { recursive: true })
-
-  // Sauvegarder l'image
-  const filePath = path.join(uploadsDir, filename)
-  await writeFile(filePath, cleanBuffer)
-
-  return `/uploads/${filename}`
-}
-
-/**
  * Importe une photo scrapée dans la base de données
  * Vérifie les doublons via instagramPostUrl
+ * NOTE: Les images ne sont pas téléchargées - on utilise directement originalUrl
  * @param sourceId - ID de la source Instagram
  * @param photo - Données de la photo scrapée
  * @returns SourcePhoto créée ou null si doublon
@@ -256,7 +227,7 @@ async function downloadImage(imageUrl: string, filename: string): Promise<string
 export async function importScrapedPhoto(
   sourceId: string,
   photo: ApifyPhoto
-): Promise<{ id: string; localPath: string | null; status: string } | null> {
+): Promise<{ id: string; originalUrl: string; status: string } | null> {
   // Vérifier si cette photo existe déjà (doublon)
   const existing = await prisma.sourcePhoto.findUnique({
     where: { instagramPostUrl: photo.postUrl }
@@ -267,26 +238,13 @@ export async function importScrapedPhoto(
     return null
   }
 
-  // Générer un nom de fichier unique
-  const timestamp = Date.now()
-  const randomId = Math.random().toString(36).substring(2, 8)
-  const filename = `scraped_${timestamp}_${randomId}.jpg`
-
-  // Télécharger l'image
-  let localPath: string | null = null
-  try {
-    localPath = await downloadImage(photo.url, filename)
-  } catch (error) {
-    console.error('Error downloading image:', error)
-    // On continue quand même, l'image sera téléchargée plus tard si nécessaire
-  }
-
   // Créer l'entrée dans la base de données
+  // NOTE: localPath n'est plus utilisé sur Vercel, on garde originalUrl
   const sourcePhoto = await prisma.sourcePhoto.create({
     data: {
       sourceId,
       originalUrl: photo.url,
-      localPath,
+      localPath: null, // Plus de stockage local sur Vercel
       instagramPostUrl: photo.postUrl,
       status: 'pending',
       description: photo.caption?.substring(0, 500) || null, // Limiter la description
@@ -295,7 +253,7 @@ export async function importScrapedPhoto(
 
   return {
     id: sourcePhoto.id,
-    localPath: sourcePhoto.localPath,
+    originalUrl: sourcePhoto.originalUrl,
     status: sourcePhoto.status,
   }
 }

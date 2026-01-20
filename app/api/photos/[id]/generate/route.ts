@@ -1,30 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFile, access, writeFile } from 'fs/promises'
-import path from 'path'
 import prisma from '@/lib/prisma'
 import { generateImageWithGeminiWithRetry, GoogleAIError, ImageGenerationConfig } from '@/lib/google-ai'
 import { generateImageWithWavespeed, WavespeedError } from '@/lib/wavespeed'
 import { removeExifFromBuffer } from '@/lib/exif-remover'
 
-// Chemins possibles pour la photo de référence
-const REFERENCE_PATHS = [
-  path.join(process.cwd(), 'public', 'reference', 'model.jpg'),
-  path.join(process.cwd(), 'public', 'reference', 'model.png'),
-]
-
 /**
- * Trouve et retourne le chemin de la photo de référence
+ * Récupère la photo de référence depuis la base de données (base64)
+ * Retourne le base64 pur (sans le préfixe data:...)
  */
-async function getReferencePhotoPath(): Promise<string | null> {
-  for (const refPath of REFERENCE_PATHS) {
-    try {
-      await access(refPath)
-      return refPath
-    } catch {
-      // Fichier n'existe pas, continuer
+async function getReferencePhotoBase64(): Promise<string | null> {
+  const setting = await prisma.settings.findUnique({
+    where: { key: 'reference_photo_base64' }
+  })
+
+  if (!setting?.value) {
+    return null
+  }
+
+  // Extraire le base64 pur si c'est un data URL
+  let base64Data = setting.value
+  if (base64Data.startsWith('data:')) {
+    const matches = base64Data.match(/^data:[^;]+;base64,(.+)$/)
+    if (matches) {
+      base64Data = matches[1]
     }
   }
-  return null
+
+  return base64Data
 }
 
 /**
@@ -58,6 +60,7 @@ async function getGenerationSettings(): Promise<GenerationSettings> {
 /**
  * POST /api/photos/[id]/generate
  * Génère une image via Gemini ou Wavespeed selon la configuration
+ * Stocke le résultat en base64 dans la base de données (compatible Vercel)
  */
 export async function POST(
   request: NextRequest,
@@ -94,29 +97,15 @@ export async function POST(
       )
     }
 
-    // Récupérer la photo de référence du modèle
-    const referencePhotoPath = await getReferencePhotoPath()
+    // Récupérer la photo de référence depuis la base de données
+    const referenceBase64 = await getReferencePhotoBase64()
 
-    if (!referencePhotoPath) {
+    if (!referenceBase64) {
       return NextResponse.json(
         { error: 'Configurez d\'abord votre photo de référence dans Settings' },
         { status: 400 }
       )
     }
-
-    // Charger l'image de référence
-    let referenceBuffer: Buffer
-    try {
-      referenceBuffer = await readFile(referencePhotoPath)
-    } catch {
-      return NextResponse.json(
-        { error: 'Impossible de lire la photo de référence' },
-        { status: 500 }
-      )
-    }
-
-    // Convertir en base64 pour les APIs
-    const referenceBase64 = referenceBuffer.toString('base64')
 
     // Récupérer la configuration de génération
     const settings = await getGenerationSettings()
@@ -128,14 +117,11 @@ export async function POST(
     let generatedImageBuffer: Buffer
 
     if (provider === 'wavespeed') {
-      // Génération via Wavespeed (google/nano-banana-pro/edit)
-      // Wavespeed nécessite un chemin relatif vers l'image (sera converti en URL publique)
-      const referenceRelativePath = referencePhotoPath.includes('model.jpg')
-        ? '/reference/model.jpg'
-        : '/reference/model.png'
-
+      // Génération via Wavespeed
+      // Wavespeed nécessite une URL publique pour l'image de référence
+      // On utilise l'endpoint /api/images/reference
       generatedImageBuffer = await generateImageWithWavespeed(
-        referenceRelativePath,
+        '/api/images/reference',
         sourcePhoto.generatedPrompt,
         settings.aspectRatio || '9:16',
         settings.imageSize || '2K'
@@ -155,25 +141,26 @@ export async function POST(
       )
     }
 
-    // Supprimer les métadonnées EXIF de l'image avant sauvegarde
+    // Supprimer les métadonnées EXIF de l'image
     const cleanImageData = await removeExifFromBuffer(generatedImageBuffer)
 
-    // Générer le nom du fichier et sauvegarder
-    const timestamp = Date.now()
-    const fileName = `generated_${sourcePhoto.id}_${timestamp}.jpg`
-    const outputPath = path.join(process.cwd(), 'public', 'generated', fileName)
+    // Convertir en base64 pour stockage en base de données
+    const imageBase64 = `data:image/jpeg;base64,${cleanImageData.toString('base64')}`
 
-    await writeFile(outputPath, cleanImageData)
-
-    const localPath = `/generated/${fileName}`
-
-    // Créer l'entrée dans GeneratedPhoto
+    // Créer l'entrée dans GeneratedPhoto avec l'image en base64
     const generatedPhoto = await prisma.generatedPhoto.create({
       data: {
         sourcePhotoId: sourcePhoto.id,
         prompt: sourcePhoto.generatedPrompt,
-        localPath: localPath,
+        localPath: `/api/images/generated/`, // Préfixe pour compatibilité, l'ID sera ajouté
+        imageData: imageBase64,
       }
+    })
+
+    // Mettre à jour localPath avec l'ID réel
+    await prisma.generatedPhoto.update({
+      where: { id: generatedPhoto.id },
+      data: { localPath: `/api/images/generated/${generatedPhoto.id}` }
     })
 
     return NextResponse.json({
@@ -181,7 +168,7 @@ export async function POST(
       provider: provider,
       generatedPhoto: {
         id: generatedPhoto.id,
-        localPath: generatedPhoto.localPath,
+        localPath: `/api/images/generated/${generatedPhoto.id}`,
         prompt: generatedPhoto.prompt,
         createdAt: generatedPhoto.createdAt.toISOString(),
       }

@@ -45,7 +45,8 @@ model GeneratedPhoto {
   sourcePhotoId String      // Référence à la photo source
   sourcePhoto   SourcePhoto @relation(fields: [sourcePhotoId], references: [id], onDelete: Cascade)
   prompt        String      // Prompt utilisé pour la génération
-  localPath     String      // Chemin local de l'image générée
+  localPath     String?     // Chemin local (legacy, non utilisé sur Vercel)
+  imageData     String?     // Image en base64 (stockage cloud-compatible)
   createdAt     DateTime    @default(now())
 
   @@index([sourcePhotoId])

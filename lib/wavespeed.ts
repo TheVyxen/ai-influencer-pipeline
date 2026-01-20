@@ -5,6 +5,8 @@
  *
  * IMPORTANT: Wavespeed nécessite des URLs publiques pour les images
  * L'app doit être déployée et NEXT_PUBLIC_APP_URL configuré
+ *
+ * L'image de référence est servie via /api/images/reference (stockée en base64 dans la DB)
  */
 
 import prisma from './prisma'
