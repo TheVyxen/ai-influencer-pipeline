@@ -1,0 +1,61 @@
+// Prisma Schema for AI Influencer Photo Pipeline
+// Database: SQLite (local development)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Comptes Instagram à scraper
+model Source {
+  id        String        @id @default(cuid())
+  username  String        @unique // Nom d'utilisateur Instagram
+  isActive  Boolean       @default(true) // Actif ou non pour le scraping
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  photos    SourcePhoto[] // Photos scrapées depuis ce compte
+}
+
+// Photos scrapées depuis Instagram
+model SourcePhoto {
+  id               String           @id @default(cuid())
+  sourceId         String           // Référence au compte source
+  source           Source           @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  originalUrl      String           // URL originale de la photo Instagram
+  localPath        String?          // Chemin local après téléchargement
+  status           String           @default("pending") // pending | approved | rejected
+  description      String?          // Description courte (legacy)
+  generatedPrompt  String?          // Prompt complet généré par Google AI Gemini
+  instagramPostUrl String?          @unique // URL du post Instagram original (pour éviter doublons)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  generatedPhotos  GeneratedPhoto[] // Photos générées à partir de cette source
+
+  @@index([status])
+  @@index([sourceId])
+}
+
+// Photos générées via Gemini 3 Pro Image ou Wavespeed
+model GeneratedPhoto {
+  id            String      @id @default(cuid())
+  sourcePhotoId String      // Référence à la photo source
+  sourcePhoto   SourcePhoto @relation(fields: [sourcePhotoId], references: [id], onDelete: Cascade)
+  prompt        String      // Prompt utilisé pour la génération
+  localPath     String      // Chemin local de l'image générée
+  createdAt     DateTime    @default(now())
+
+  @@index([sourcePhotoId])
+}
+
+// Configuration clé/valeur pour les paramètres de l'application
+model Settings {
+  id        String   @id @default(cuid())
+  key       String   @unique // Clé du paramètre (ex: "apify_api_key")
+  value     String   // Valeur du paramètre
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
