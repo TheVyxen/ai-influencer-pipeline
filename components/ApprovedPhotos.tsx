@@ -14,10 +14,6 @@ interface ApprovedPhoto {
   status: string
   generatedPrompt: string | null
   createdAt: string
-  // Champs carrousel
-  isCarousel: boolean
-  carouselId: string | null
-  carouselIndex: number | null
   source: {
     username: string
   }
@@ -134,7 +130,7 @@ export function ApprovedPhotos({ initialPhotos }: ApprovedPhotosProps) {
     }
   }
 
-  // Décrire la sélection en lot (utilise describeCarouselPhotos pour les carrousels)
+  // Décrire la sélection en lot
   const handleDescribeSelected = async () => {
     if (selectedIds.size === 0) return
 
@@ -145,44 +141,44 @@ export function ApprovedPhotos({ initialPhotos }: ApprovedPhotosProps) {
     }
 
     setBatchProcessing({ action: 'describe', progress: 0, total: photosToDescribe.length })
+    let successCount = 0
+    let errorCount = 0
 
-    try {
-      // Utiliser l'endpoint batch qui gère les carrousels
-      const res = await fetch('/api/photos/describe-batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photoIds: photosToDescribe.map(p => p.id) })
-      })
+    for (let i = 0; i < photosToDescribe.length; i++) {
+      const photo = photosToDescribe[i]
+      setBatchProcessing({ action: 'describe', progress: i + 1, total: photosToDescribe.length })
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Erreur lors de la description')
-      }
-
-      // Mettre à jour les photos avec les prompts générés
-      const resultMap = new Map(data.results.map((r: { id: string; prompt: string }) => [r.id, r.prompt]))
-      setPhotos(prev =>
-        prev.map(p => {
-          const prompt = resultMap.get(p.id)
-          return prompt ? { ...p, generatedPrompt: prompt as string } : p
+      try {
+        const res = await fetch(`/api/photos/${photo.id}/describe`, {
+          method: 'POST'
         })
-      )
 
-      const successCount = data.results.filter((r: { success: boolean }) => r.success).length
-      const errorCount = data.results.filter((r: { success: boolean }) => !r.success).length
+        const data = await res.json()
 
-      if (successCount > 0) {
-        toast.success(`${successCount} photo(s) décrite(s)`)
+        if (!res.ok) {
+          throw new Error(data.error || 'Erreur')
+        }
+
+        setPhotos(prev =>
+          prev.map(p =>
+            p.id === photo.id ? { ...p, generatedPrompt: data.prompt } : p
+          )
+        )
+        successCount++
+      } catch (err) {
+        errorCount++
+        console.error(`Error describing photo ${photo.id}:`, err)
       }
-      if (errorCount > 0) {
-        toast.error(`${errorCount} erreur(s) lors de la description`)
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Erreur lors de la description')
-    } finally {
-      setBatchProcessing(null)
-      setSelectedIds(new Set())
+    }
+
+    setBatchProcessing(null)
+    setSelectedIds(new Set())
+
+    if (successCount > 0) {
+      toast.success(`${successCount} photo(s) décrite(s)`)
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} erreur(s) lors de la description`)
     }
   }
 
