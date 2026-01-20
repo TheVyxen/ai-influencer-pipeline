@@ -1,7 +1,6 @@
 import prisma from '@/lib/prisma'
 import { SourceList } from '@/components/SourceList'
 import { PhotoValidation } from '@/components/PhotoValidation'
-import { ApprovedPhotos } from '@/components/ApprovedPhotos'
 import { GeneratedGallery } from '@/components/GeneratedGallery'
 import { StatsBar } from '@/components/StatsBar'
 
@@ -10,11 +9,12 @@ export const dynamic = 'force-dynamic'
 
 /**
  * Dashboard principal - Page d'accueil
- * Layout 2x2 : Sources + Validation | Approuvées + Générées
+ * Layout simplifié : Sources | Photos à valider | Photos générées
+ * Workflow : Valider = Décrire + Générer automatiquement
  */
 export default async function Home() {
   // Fetch toutes les données côté serveur
-  const [sources, pendingPhotos, approvedPhotos, generatedPhotos, lastGenerated] = await Promise.all([
+  const [sources, pendingPhotos, generatedPhotos, lastGenerated] = await Promise.all([
     prisma.source.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
@@ -25,15 +25,6 @@ export default async function Home() {
     }),
     prisma.sourcePhoto.findMany({
       where: { status: 'pending' },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        source: {
-          select: { username: true }
-        }
-      }
-    }),
-    prisma.sourcePhoto.findMany({
-      where: { status: 'approved' },
       orderBy: { createdAt: 'desc' },
       include: {
         source: {
@@ -75,16 +66,6 @@ export default async function Home() {
     originalUrl: p.originalUrl,
     localPath: p.localPath,
     status: p.status,
-    createdAt: p.createdAt.toISOString(),
-    source: p.source
-  }))
-
-  const approvedPhotosData = approvedPhotos.map(p => ({
-    id: p.id,
-    originalUrl: p.originalUrl,
-    localPath: p.localPath,
-    status: p.status,
-    generatedPrompt: p.generatedPrompt,
     createdAt: p.createdAt.toISOString(),
     source: p.source
   }))
@@ -132,24 +113,23 @@ export default async function Home() {
         </div>
       </header>
 
-      {/* Contenu principal - Layout 2x2 */}
+      {/* Contenu principal - Layout 3 colonnes */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Barre de statistiques */}
         <StatsBar
           sourcesCount={sources.length}
           pendingCount={pendingPhotos.length}
-          approvedCount={approvedPhotos.length}
           generatedCount={generatedPhotos.length}
           lastActivity={lastGenerated?.createdAt?.toISOString() || null}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Section 1 : Sources Instagram */}
           <div>
             <SourceList initialSources={sourcesData} />
           </div>
 
-          {/* Section 2 : Photos à valider (pending) */}
+          {/* Section 2 : Photos à valider (validation = génération auto) */}
           <div>
             <PhotoValidation
               initialPhotos={pendingPhotosData}
@@ -157,12 +137,7 @@ export default async function Home() {
             />
           </div>
 
-          {/* Section 3 : Photos approuvées (avec bouton décrire) */}
-          <div>
-            <ApprovedPhotos initialPhotos={approvedPhotosData} />
-          </div>
-
-          {/* Section 4 : Photos générées */}
+          {/* Section 3 : Photos générées */}
           <div>
             <GeneratedGallery photos={generatedPhotosData} />
           </div>

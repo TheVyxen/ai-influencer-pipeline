@@ -1,22 +1,21 @@
 'use client'
 
-import { Users, Clock, CheckCircle, Activity, Sparkles } from 'lucide-react'
+import { Users, Clock, Activity, Sparkles } from 'lucide-react'
 
 interface StatsBarProps {
   sourcesCount: number
   pendingCount: number
-  approvedCount: number
   generatedCount: number
   lastActivity: string | null
 }
 
 /**
  * Barre de statistiques en haut du dashboard
+ * Workflow simplifié : Sources → En attente → Générées
  */
 export function StatsBar({
   sourcesCount,
   pendingCount,
-  approvedCount,
   generatedCount,
   lastActivity,
 }: StatsBarProps) {
@@ -32,12 +31,6 @@ export function StatsBar({
       value: pendingCount,
       icon: Clock,
       color: 'text-yellow-600 bg-yellow-50',
-    },
-    {
-      label: 'Approuvées',
-      value: approvedCount,
-      icon: CheckCircle,
-      color: 'text-green-600 bg-green-50',
     },
     {
       label: 'Générées',
@@ -70,7 +63,7 @@ export function StatsBar({
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {stats.map((stat) => {
         const Icon = stat.icon
         return (

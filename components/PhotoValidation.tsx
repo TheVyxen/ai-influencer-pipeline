@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import toast from 'react-hot-toast'
-import { Clock, Upload, Check, X, CheckSquare, Square, XSquare } from 'lucide-react'
+import { Clock, Upload, Check, X, CheckSquare, Square, XSquare, Loader2 } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
 
@@ -45,6 +45,9 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
 
+  // État pour suivre la photo en cours de traitement (approve + describe + generate)
+  const [processingId, setProcessingId] = useState<string | null>(null)
+
   // État pour la modal de confirmation de rejet
   const [rejectModal, setRejectModal] = useState<{ isOpen: boolean; photoIds: string[] }>({
     isOpen: false,
@@ -73,14 +76,21 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
     }
   }
 
-  // Approuver une photo
+  // Approuver une photo (workflow complet : approve + describe + generate)
   const handleApprove = async (id: string) => {
+    setProcessingId(id)
+    const toastId = toast.loading('Validation et génération en cours...', { duration: Infinity })
+
     try {
       const res = await fetch(`/api/photos/${id}/approve`, {
         method: 'PATCH'
       })
 
-      if (!res.ok) throw new Error('Failed to approve')
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Échec du traitement')
+      }
 
       setPhotos(prev => prev.filter(p => p.id !== id))
       setSelectedIds(prev => {
@@ -88,11 +98,14 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
         newSet.delete(id)
         return newSet
       })
-      toast.success('Photo approuvée')
+      toast.success('Photo validée et générée !', { id: toastId })
       router.refresh()
     } catch (err) {
-      toast.error('Erreur lors de l\'approbation')
-      console.error('Error approving photo:', err)
+      const errorMsg = err instanceof Error ? err.message : 'Erreur lors du traitement'
+      toast.error(errorMsg, { id: toastId })
+      console.error('Error in approve workflow:', err)
+    } finally {
+      setProcessingId(null)
     }
   }
 
@@ -135,39 +148,52 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
     setRejectModal({ isOpen: false, photoIds: [] })
   }
 
-  // Approuver la sélection
+  // Approuver la sélection (workflow complet pour chaque photo)
   const handleApproveSelected = async () => {
     if (selectedIds.size === 0) return
 
     setIsProcessing(true)
-    const toastId = toast.loading(`Approbation de ${selectedIds.size} photo(s)...`)
+    const total = selectedIds.size
     let successCount = 0
     let errorCount = 0
 
-    for (const id of Array.from(selectedIds)) {
+    const toastId = toast.loading(`Traitement de ${total} photo(s)... (0/${total})`, { duration: Infinity })
+
+    const idsArray = Array.from(selectedIds)
+    for (let i = 0; i < idsArray.length; i++) {
+      const id = idsArray[i]
+      toast.loading(`Traitement de ${total} photo(s)... (${i + 1}/${total})`, { id: toastId })
+
       try {
         const res = await fetch(`/api/photos/${id}/approve`, {
           method: 'PATCH'
         })
 
-        if (!res.ok) throw new Error('Failed to approve')
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Échec du traitement')
+        }
 
         setPhotos(prev => prev.filter(p => p.id !== id))
         successCount++
       } catch (err) {
         errorCount++
-        console.error('Error approving photo:', err)
+        console.error('Error in approve workflow:', err)
       }
     }
 
     setSelectedIds(new Set())
     setIsProcessing(false)
 
-    if (successCount > 0) {
-      toast.success(`${successCount} photo(s) approuvée(s)`, { id: toastId })
+    if (successCount > 0 && errorCount === 0) {
+      toast.success(`${successCount} photo(s) traitée(s) avec succès !`, { id: toastId })
+      router.refresh()
+    } else if (successCount > 0) {
+      toast.success(`${successCount} photo(s) traitée(s), ${errorCount} erreur(s)`, { id: toastId })
       router.refresh()
     } else {
-      toast.error('Erreur lors de l\'approbation', { id: toastId })
+      toast.error(`Échec du traitement (${errorCount} erreur(s))`, { id: toastId })
     }
   }
 
@@ -302,11 +328,16 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
             </div>
           )}
 
-          {/* Aide raccourcis */}
+          {/* Aide raccourcis et workflow */}
           {photos.length > 0 && (
-            <p className="mt-2 text-xs text-gray-400">
-              Raccourcis : ← → naviguer | A approuver | R rejeter
-            </p>
+            <div className="mt-2 space-y-1">
+              <p className="text-xs text-gray-500">
+                Valider = Décrire + Générer automatiquement
+              </p>
+              <p className="text-xs text-gray-400">
+                Raccourcis : ← → naviguer | A approuver | R rejeter
+              </p>
+            </div>
           )}
         </div>
 
@@ -331,6 +362,14 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                   onClick={() => setCurrentPhotoIndex(index)}
                 >
                   <div className="aspect-square relative bg-gray-100">
+                    {/* Overlay de traitement */}
+                    {processingId === photo.id && (
+                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center z-20">
+                        <Loader2 className="w-8 h-8 text-white animate-spin" />
+                        <span className="text-white text-xs mt-2 font-medium">Génération...</span>
+                      </div>
+                    )}
+
                     {/* Checkbox de sélection */}
                     <div className="absolute top-2 left-2 z-10">
                       <button
@@ -338,11 +377,12 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                           e.stopPropagation()
                           toggleSelection(photo.id)
                         }}
+                        disabled={processingId !== null}
                         className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
                           selectedIds.has(photo.id)
                             ? 'bg-blue-500 border-blue-500 text-white'
                             : 'bg-white/80 border-gray-300 hover:border-blue-400'
-                        }`}
+                        } disabled:opacity-50`}
                       >
                         {selectedIds.has(photo.id) && (
                           <Check className="w-4 h-4" strokeWidth={3} />
@@ -373,16 +413,26 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                           e.stopPropagation()
                           handleApprove(photo.id)
                         }}
-                        className="flex-1 py-1.5 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-1"
+                        disabled={processingId !== null || isProcessing}
+                        className={`flex-1 py-1.5 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                          processingId === photo.id
+                            ? 'bg-green-400 cursor-wait'
+                            : 'bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed'
+                        }`}
                       >
-                        <Check className="w-4 h-4" />
+                        {processingId === photo.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Check className="w-4 h-4" />
+                        )}
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
                           setRejectModal({ isOpen: true, photoIds: [photo.id] })
                         }}
-                        className="flex-1 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-1"
+                        disabled={processingId !== null || isProcessing}
+                        className="flex-1 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
                       >
                         <X className="w-4 h-4" />
                       </button>

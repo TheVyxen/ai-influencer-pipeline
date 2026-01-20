@@ -124,7 +124,7 @@ export async function POST(
         '/api/images/reference',
         sourcePhoto.generatedPrompt,
         settings.aspectRatio || '9:16',
-        settings.imageSize || '2K'
+        'png' // Wavespeed supporte jpeg ou png, on utilise png pour la qualité
       )
     } else {
       // Génération via Gemini avec retry automatique (3 tentatives, 5s entre chaque)

@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { Sparkles, Eye, Download, Copy, X, Check, Trash2 } from 'lucide-react'
+import { Sparkles, Eye, Download, Copy, X, Check, Trash2, FileText } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
 
@@ -27,8 +28,10 @@ interface GeneratedGalleryProps {
  * Section des photos générées via Gemini 3
  */
 export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProps) {
+  const router = useRouter()
   const [photos, setPhotos] = useState<GeneratedPhoto[]>(initialPhotos)
   const [selectedPrompt, setSelectedPrompt] = useState<{ id: string; prompt: string } | null>(null)
+  const [selectedImage, setSelectedImage] = useState<{ id: string; url: string; prompt: string } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isDownloadingZip, setIsDownloadingZip] = useState(false)
 
@@ -148,6 +151,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
 
     if (successCount > 0) {
       toast.success(`${successCount} photo(s) supprimée(s)`)
+      router.refresh()
     }
     if (errorCount > 0) {
       toast.error(`${errorCount} erreur(s) lors de la suppression`)
@@ -294,14 +298,27 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                     </p>
 
                     <div className="mt-2 space-y-2">
-                      {/* Bouton voir prompt */}
-                      <button
-                        onClick={() => setSelectedPrompt({ id: photo.id, prompt: photo.prompt })}
-                        className="w-full py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"
-                      >
-                        <Eye className="w-4 h-4" />
-                        Voir prompt
-                      </button>
+                      {/* Bouton voir la photo + prompt */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setSelectedImage({
+                            id: photo.id,
+                            url: photo.localPath || `/api/images/generated/${photo.id}`,
+                            prompt: photo.prompt
+                          })}
+                          className="flex-1 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"
+                        >
+                          <Eye className="w-4 h-4" />
+                          Voir
+                        </button>
+                        <button
+                          onClick={() => setSelectedPrompt({ id: photo.id, prompt: photo.prompt })}
+                          className="py-1.5 px-2.5 bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-200 hover:text-gray-700 transition-colors"
+                          title="Voir le prompt"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
+                      </div>
 
                       {/* Bouton télécharger */}
                       <button
@@ -319,6 +336,56 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
           )}
         </div>
       </div>
+
+      {/* Modal pour afficher l'image en grand */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <div className="relative max-w-5xl max-h-[90vh] w-full" onClick={e => e.stopPropagation()}>
+            {/* Bouton fermer */}
+            <button
+              onClick={() => setSelectedImage(null)}
+              className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors"
+            >
+              <X className="w-8 h-8" />
+            </button>
+
+            {/* Image */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={selectedImage.url}
+              alt="Photo générée"
+              className="max-w-full max-h-[80vh] object-contain rounded-lg mx-auto"
+            />
+
+            {/* Actions en bas */}
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button
+                onClick={() => {
+                  setSelectedImage(null)
+                  setSelectedPrompt({ id: selectedImage.id, prompt: selectedImage.prompt })
+                }}
+                className="px-4 py-2 bg-white/10 text-white text-sm font-medium rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                Voir le prompt
+              </button>
+              <button
+                onClick={() => {
+                  const photo = photos.find(p => p.id === selectedImage.id)
+                  if (photo) handleDownload(photo)
+                }}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Télécharger
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal pour afficher le prompt */}
       {selectedPrompt && (

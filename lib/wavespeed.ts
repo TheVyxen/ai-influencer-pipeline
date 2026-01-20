@@ -81,15 +81,15 @@ export function isAppDeployed(): boolean {
  * Génère une image via Wavespeed API (google/nano-banana-pro/edit)
  * @param referenceImagePath - Chemin relatif de l'image de référence (ex: "/reference/model.jpg")
  * @param prompt - Le prompt de génération
- * @param aspectRatio - Format d'image (9:16, 1:1, 16:9) - défaut: 9:16
- * @param resolution - Résolution (1k, 2k, 4k) - défaut: 2k
+ * @param aspectRatio - Format d'image (9:16, 1:1, 16:9, 3:2, 2:3, etc.) - défaut: 9:16
+ * @param outputFormat - Format de sortie (jpeg, png) - défaut: png
  * @returns Buffer de l'image générée
  */
 export async function generateImageWithWavespeed(
   referenceImagePath: string,
   prompt: string,
   aspectRatio: string = '9:16',
-  resolution: string = '2k'
+  outputFormat: string = 'png'
 ): Promise<Buffer> {
   const apiKey = await getApiKey()
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
@@ -125,8 +125,7 @@ export async function generateImageWithWavespeed(
         prompt: prompt,
         images: [referenceImageUrl],
         aspect_ratio: aspectRatio,
-        resolution: resolution.toLowerCase(),
-        output_format: 'png',
+        output_format: outputFormat,
         enable_sync_mode: true
       })
     })
