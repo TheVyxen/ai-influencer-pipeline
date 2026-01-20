@@ -63,6 +63,47 @@ Comportement attendu.
 Tu produis uniquement le prompt, sans commentaire, sans explication, sans introduction. Juste le prompt prêt à l'emploi.`
 
 /**
+ * Prompt système pour Gemini - description de carrousels (plusieurs images)
+ * Génère un prompt par image, séparés par "---NEXT---"
+ */
+const CAROUSEL_SYSTEM_PROMPT = `Tu es un expert en prompt engineering spécialisé dans la description d'images pour la génération photo-réaliste. Ton rôle unique est de produire des prompts exploitables tels quels pour des générateurs d'images avancés.
+
+Règles fondamentales et non négociables.
+Tu décris toujours précisément tout ce qui n'est pas une caractéristique physique de la fille. Tu ne décris jamais le visage, le corps, l'âge, les traits, la morphologie, la couleur de peau ou tout élément assimilable à une description physique. À la place, tu insistes explicitement sur le fait qu'il s'agit exactement de la même fille que sur l'image d'entrée.
+
+Chaque prompt commence obligatoirement et exactement par la phrase suivante, sans variation.
+"Preserve the identity of the person from the input image. "
+
+Langue et ton.
+Tu écris en anglais pour les prompts de génération d'images. Le ton est professionnel, rigoureux, précis, sans poésie inutile, sans métaphores, sans approximations. Tu vises un rendu exploitable, cohérent, contrôlable. Aucun emoji. Aucun langage familier.
+
+Structure attendue des prompts.
+Tu décris systématiquement, avec un haut niveau de précision.
+Le contexte et l'environnement. Lieu, décor, objets, textures, ambiance, époque si pertinent.
+La position et la posture. Orientation du corps, angle, appuis, dynamique.
+L'angle de prise de vue et la logique selfie. Perspective, hauteur, distance, cadrage.
+La tenue. Vêtements, matières, couleurs, coupe, accessoires visibles.
+Les objets et props présents dans la scène.
+L'ambiance générale. Lifestyle, intimité, énergie, mood.
+Le style photographique. Ultra-réaliste, photo lifestyle, rendu naturel.
+La qualité. Haute résolution, textures réalistes, comportement de lentille crédible.
+
+Contraintes techniques spécifiques.
+Ne jamais mentionner de téléphone visible, de flash, ni de lumière de téléphone.
+Pas de filtres. Pas de stylisation artistique. Pas d'effets beauté. Pas de retouche artificielle.
+Rendu photo-réaliste uniquement.
+
+Gestion de séries d'images.
+Tu produis un premier prompt principal complet pour la première image.
+Pour les images suivantes, tu produis des prompts séparés dont l'unique objectif est de changer la position.
+Tu insistes explicitement sur la préservation stricte du décor, de l'environnement, de la lumière ambiante, des couleurs, des objets, des vêtements, des accessoires, de l'angle général et de l'atmosphère.
+Les prompts secondaires modifient uniquement la posture et l'orientation du corps. Rien d'autre.
+
+FORMAT DE SORTIE OBLIGATOIRE.
+Sépare chaque prompt avec exactement "---NEXT---" sur une ligne seule.
+Ne produis que les prompts, rien d'autre.`
+
+/**
  * Vérifie si la clé API Google AI est configurée
  */
 export async function isGoogleAIConfigured(): Promise<boolean> {
@@ -180,6 +221,130 @@ export async function describePhoto(
       throw new GoogleAIError(
         'Impossible d\'analyser cette image',
         'INVALID_IMAGE'
+      )
+    }
+
+    // Erreur générique
+    throw new GoogleAIError(
+      `Erreur Google AI: ${errorMessage}`,
+      'UNKNOWN'
+    )
+  }
+}
+
+/**
+ * Génère des prompts de description pour un carrousel d'images via Gemini 3 Pro Vision
+ * Envoie toutes les images en une seule requête et reçoit un prompt par image
+ * @param imageBuffers - Tableau de Buffers des images à analyser
+ * @returns Tableau de prompts (un par image)
+ */
+export async function describeCarouselPhotos(
+  imageBuffers: Buffer[]
+): Promise<string[]> {
+  const apiKey = await getApiKey()
+
+  if (!apiKey) {
+    throw new GoogleAIError(
+      'Configurez votre clé Google AI dans Settings',
+      'NOT_CONFIGURED'
+    )
+  }
+
+  if (imageBuffers.length === 0) {
+    return []
+  }
+
+  // Si une seule image, utiliser la fonction standard
+  if (imageBuffers.length === 1) {
+    const prompt = await describePhoto(imageBuffers[0])
+    return [prompt]
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey })
+
+    // Créer les parts pour chaque image
+    const imageParts = imageBuffers.map(buffer => ({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: buffer.toString('base64')
+      }
+    }))
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: [
+        {
+          parts: [
+            { text: CAROUSEL_SYSTEM_PROMPT },
+            ...imageParts
+          ]
+        }
+      ],
+      config: {
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.LOW
+        }
+      }
+    })
+
+    // Extraire le texte de la réponse
+    const fullText = response.candidates?.[0]?.content?.parts?.find(
+      (part: { text?: string }) => part.text
+    )?.text || ''
+
+    if (!fullText || fullText.trim().length === 0) {
+      throw new GoogleAIError(
+        'Impossible d\'analyser ces images',
+        'INVALID_IMAGE'
+      )
+    }
+
+    // Séparer les prompts par le délimiteur
+    const prompts = fullText
+      .split('---NEXT---')
+      .map(p => p.trim())
+      .filter(p => p.length > 0)
+
+    // Vérifier qu'on a au moins autant de prompts que d'images
+    if (prompts.length < imageBuffers.length) {
+      console.warn(`Carousel: received ${prompts.length} prompts for ${imageBuffers.length} images`)
+      // Compléter avec des copies du dernier prompt si nécessaire
+      while (prompts.length < imageBuffers.length) {
+        prompts.push(prompts[prompts.length - 1] || 'Preserve the identity of the person from the input image.')
+      }
+    }
+
+    return prompts.slice(0, imageBuffers.length)
+  } catch (error) {
+    // Gérer les erreurs spécifiques
+    if (error instanceof GoogleAIError) {
+      throw error
+    }
+
+    const errorMessage = error instanceof Error ? error.message : String(error)
+
+    // Rate limit
+    if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate')) {
+      throw new GoogleAIError(
+        'Trop de requêtes, réessayez dans quelques secondes',
+        'RATE_LIMIT'
+      )
+    }
+
+    // Contenu bloqué
+    if (errorMessage.includes('blocked') || errorMessage.includes('safety') || errorMessage.includes('HARM')) {
+      throw new GoogleAIError(
+        'Les images ont été bloquées par les filtres de sécurité',
+        'CONTENT_BLOCKED'
+      )
+    }
+
+    // Erreur de connexion
+    if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED')) {
+      throw new GoogleAIError(
+        'Erreur de connexion à Google AI',
+        'CONNECTION_ERROR'
       )
     }
 

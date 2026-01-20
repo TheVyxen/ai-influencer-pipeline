@@ -30,13 +30,22 @@ model SourcePhoto {
   status           String           @default("pending") // pending | approved | rejected
   description      String?          // Description courte (legacy)
   generatedPrompt  String?          // Prompt complet généré par Google AI Gemini
-  instagramPostUrl String?          @unique // URL du post Instagram original (pour éviter doublons)
+  instagramPostUrl String?          // URL du post Instagram original
+
+  // Champs pour les carrousels Instagram
+  isCarousel       Boolean          @default(false) // true si fait partie d'un carrousel
+  carouselId       String?          // ID unique pour regrouper les images du même carrousel
+  carouselIndex    Int?             // Position dans le carrousel (0, 1, 2...)
+  carouselTotal    Int?             // Nombre total d'images dans le carrousel
+
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   generatedPhotos  GeneratedPhoto[] // Photos générées à partir de cette source
 
+  @@unique([instagramPostUrl, carouselIndex]) // Éviter les doublons (même post + même index)
   @@index([status])
   @@index([sourceId])
+  @@index([carouselId])
 }
 
 // Photos générées via Gemini 3 Pro Image ou Wavespeed
@@ -47,9 +56,17 @@ model GeneratedPhoto {
   prompt        String      // Prompt utilisé pour la génération
   localPath     String?     // Chemin local (legacy, non utilisé sur Vercel)
   imageData     String?     // Image en base64 (stockage cloud-compatible)
+
+  // Champs pour les carrousels générés
+  isCarousel    Boolean     @default(false) // true si fait partie d'un carrousel généré
+  carouselId    String?     // ID unique pour regrouper les images générées du même carrousel
+  carouselIndex Int?        // Position dans le carrousel (0, 1, 2...)
+  carouselTotal Int?        // Nombre total d'images dans le carrousel
+
   createdAt     DateTime    @default(now())
 
   @@index([sourcePhotoId])
+  @@index([carouselId])
 }
 
 // Configuration clé/valeur pour les paramètres de l'application

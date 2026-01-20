@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { Sparkles, Eye, Download, Copy, X, Check, Trash2, FileText } from 'lucide-react'
+import { Sparkles, Eye, Download, Copy, X, Check, Trash2, FileText, Layers } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
 
@@ -12,6 +12,11 @@ interface GeneratedPhoto {
   prompt: string
   localPath: string | null
   createdAt: string
+  // Champs carrousel
+  isCarousel?: boolean
+  carouselId?: string | null
+  carouselIndex?: number | null
+  carouselTotal?: number | null
   sourcePhoto: {
     id: string
     source: {
@@ -25,7 +30,8 @@ interface GeneratedGalleryProps {
 }
 
 /**
- * Section des photos générées via Gemini 3
+ * Section des photos generees via Gemini 3
+ * Supporte l'affichage groupe des carrousels
  */
 export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProps) {
   const router = useRouter()
@@ -34,15 +40,36 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
   const [selectedImage, setSelectedImage] = useState<{ id: string; url: string; prompt: string } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isDownloadingZip, setIsDownloadingZip] = useState(false)
+  const [downloadingCarouselId, setDownloadingCarouselId] = useState<string | null>(null)
 
-  // État pour la modal de confirmation de suppression
+  // Etat pour la modal de confirmation de suppression
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; photoIds: string[] }>({
     isOpen: false,
     photoIds: [],
   })
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Toggle sélection d'une photo
+  // Regrouper les photos par carouselId
+  const groupedPhotos = useMemo(() => {
+    const carousels: Map<string, GeneratedPhoto[]> = new Map()
+    const singles: GeneratedPhoto[] = []
+
+    photos.forEach(photo => {
+      if (photo.isCarousel && photo.carouselId) {
+        const existing = carousels.get(photo.carouselId) || []
+        existing.push(photo)
+        carousels.set(photo.carouselId, existing.sort((a, b) =>
+          (a.carouselIndex || 0) - (b.carouselIndex || 0)
+        ))
+      } else {
+        singles.push(photo)
+      }
+    })
+
+    return { carousels, singles }
+  }, [photos])
+
+  // Toggle selection d'une photo
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => {
       const newSet = new Set(prev)
@@ -55,7 +82,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
     })
   }
 
-  // Sélectionner / Désélectionner tout
+  // Selectionner / Deselectionner tout
   const toggleSelectAll = () => {
     if (selectedIds.size === photos.length) {
       setSelectedIds(new Set())
@@ -64,9 +91,9 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
     }
   }
 
-  // Télécharger une photo via la nouvelle API
+  // Telecharger une photo via la nouvelle API
   const handleDownload = async (photo: GeneratedPhoto) => {
-    const toastId = toast.loading('Préparation du téléchargement...')
+    const toastId = toast.loading('Preparation du telechargement...')
 
     try {
       const response = await fetch(`/api/photos/generated/${photo.id}/download`)
@@ -81,25 +108,33 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
-      toast.success('Photo téléchargée', { id: toastId })
+      toast.success('Photo telechargee', { id: toastId })
     } catch (err) {
-      toast.error('Erreur lors du téléchargement', { id: toastId })
+      toast.error('Erreur lors du telechargement', { id: toastId })
       console.error('Error downloading photo:', err)
     }
   }
 
-  // Télécharger les photos sélectionnées en ZIP
-  const handleDownloadZip = async () => {
-    if (selectedIds.size === 0) return
+  // Telecharger les photos selectionnees en ZIP
+  const handleDownloadZip = async (ids?: string[]) => {
+    const idsToDownload = ids || Array.from(selectedIds)
+    if (idsToDownload.length === 0) return
 
-    setIsDownloadingZip(true)
-    const toastId = toast.loading(`Création du ZIP (${selectedIds.size} photos)...`)
+    if (ids) {
+      // C'est un carrousel
+      const carouselId = photos.find(p => p.id === ids[0])?.carouselId
+      if (carouselId) setDownloadingCarouselId(carouselId)
+    } else {
+      setIsDownloadingZip(true)
+    }
+
+    const toastId = toast.loading(`Creation du ZIP (${idsToDownload.length} photos)...`)
 
     try {
       const response = await fetch('/api/photos/generated/download-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedIds) })
+        body: JSON.stringify({ ids: idsToDownload })
       })
 
       if (!response.ok) throw new Error('ZIP download failed')
@@ -113,16 +148,17 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
-      toast.success('ZIP téléchargé avec succès', { id: toastId })
+      toast.success('ZIP telecharge avec succes', { id: toastId })
     } catch (err) {
-      toast.error('Erreur lors de la création du ZIP', { id: toastId })
+      toast.error('Erreur lors de la creation du ZIP', { id: toastId })
       console.error('Error downloading ZIP:', err)
     } finally {
       setIsDownloadingZip(false)
+      setDownloadingCarouselId(null)
     }
   }
 
-  // Supprimer les photos sélectionnées
+  // Supprimer les photos selectionnees
   const handleDeleteSelected = async () => {
     setIsDeleting(true)
     let successCount = 0
@@ -150,7 +186,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
     }
 
     if (successCount > 0) {
-      toast.success(`${successCount} photo(s) supprimée(s)`)
+      toast.success(`${successCount} photo(s) supprimee(s)`)
       router.refresh()
     }
     if (errorCount > 0) {
@@ -164,7 +200,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
   // Copier le prompt
   const handleCopyPrompt = (prompt: string) => {
     navigator.clipboard.writeText(prompt)
-    toast.success('Prompt copié')
+    toast.success('Prompt copie')
   }
 
   return (
@@ -176,7 +212,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
               <Sparkles className="w-5 h-5 text-purple-600" />
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
-                  Photos générées
+                  Photos generees
                   {photos.length > 0 && (
                     <span className="ml-2 text-sm font-normal text-gray-500">
                       ({photos.length})
@@ -184,28 +220,28 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                   )}
                 </h2>
                 <p className="text-xs text-gray-500">
-                  Images générées par Gemini
+                  Images generees par Gemini
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Boutons de sélection et téléchargement */}
+          {/* Boutons de selection et telechargement */}
           {photos.length > 0 && (
             <div className="mt-3 flex items-center gap-2 flex-wrap">
-              {/* Bouton Tout sélectionner / Désélectionner */}
+              {/* Bouton Tout selectionner / Deselectionner */}
               <button
                 onClick={toggleSelectAll}
                 className="px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1"
               >
-                {selectedIds.size === photos.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                {selectedIds.size === photos.length ? 'Tout deselectionner' : 'Tout selectionner'}
               </button>
 
-              {/* Actions sur la sélection */}
+              {/* Actions sur la selection */}
               {selectedIds.size > 0 && (
                 <>
                   <button
-                    onClick={handleDownloadZip}
+                    onClick={() => handleDownloadZip()}
                     disabled={isDownloadingZip}
                     className="px-2.5 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                   >
@@ -215,7 +251,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Création...
+                        Creation...
                       </>
                     ) : (
                       <>
@@ -238,101 +274,219 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
           )}
         </div>
 
-        <div className="p-4">
+        <div className="p-4 space-y-4">
           {photos.length === 0 ? (
             <EmptyState
-              message="Aucune photo générée"
+              message="Aucune photo generee"
               icon={<Sparkles className="w-12 h-12" />}
             />
           ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {photos.map((photo) => (
+            <>
+              {/* Affichage des carrousels groupes */}
+              {Array.from(groupedPhotos.carousels.entries()).map(([carouselId, carouselPhotos]) => (
                 <div
-                  key={photo.id}
-                  className={`bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-all ${
-                    selectedIds.has(photo.id)
-                      ? 'border-blue-500 ring-2 ring-blue-200'
-                      : 'border-gray-100'
-                  }`}
+                  key={carouselId}
+                  className="border rounded-lg p-4 bg-gradient-to-r from-purple-50 to-pink-50"
                 >
-                  <div className="aspect-square relative bg-gray-100">
-                    {/* Checkbox de sélection */}
-                    <div className="absolute top-2 left-2 z-10">
-                      <button
-                        onClick={() => toggleSelection(photo.id)}
-                        className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
-                          selectedIds.has(photo.id)
-                            ? 'bg-blue-500 border-blue-500 text-white'
-                            : 'bg-white/80 border-gray-300 hover:border-blue-400'
-                        }`}
-                      >
-                        {selectedIds.has(photo.id) && (
-                          <Check className="w-4 h-4" strokeWidth={3} />
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Badge généré */}
-                    <div className="absolute top-2 right-2 z-10">
-                      <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
-                        Générée
-                      </span>
-                    </div>
-
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={photo.localPath || `/api/images/generated/${photo.id}`}
-                      alt="Photo générée"
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-3">
-                    <p className="text-xs text-gray-400">
+                  {/* Header du carrousel */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <Layers className="w-4 h-4 text-purple-500" />
+                    <span className="text-sm font-medium text-purple-700">
+                      Carrousel ({carouselPhotos.length} photos)
+                    </span>
+                    <span className="text-xs text-gray-500">
                       {new Intl.DateTimeFormat('fr-FR', {
                         day: '2-digit',
                         month: '2-digit',
-                        year: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit'
-                      }).format(new Date(photo.createdAt))}
-                    </p>
+                      }).format(new Date(carouselPhotos[0].createdAt))}
+                    </span>
+                    <div className="ml-auto flex gap-2">
+                      <button
+                        onClick={() => handleDownloadZip(carouselPhotos.map(p => p.id))}
+                        disabled={downloadingCarouselId === carouselId}
+                        className="px-3 py-1 text-xs font-medium text-white bg-purple-500 rounded hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                      >
+                        {downloadingCarouselId === carouselId ? (
+                          <>
+                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          </>
+                        ) : (
+                          <Download className="w-3 h-3" />
+                        )}
+                        Telecharger tout
+                      </button>
+                      <button
+                        onClick={() => setDeleteModal({ isOpen: true, photoIds: carouselPhotos.map(p => p.id) })}
+                        className="px-3 py-1 text-xs font-medium text-white bg-red-500 rounded hover:bg-red-600 transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
 
-                    <div className="mt-2 space-y-2">
-                      {/* Bouton voir la photo + prompt */}
-                      <div className="flex gap-2">
-                        <button
+                  {/* Images du carrousel en scroll horizontal */}
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {carouselPhotos.map((photo) => (
+                      <div key={photo.id} className="relative flex-shrink-0">
+                        <div
+                          className="relative w-36 h-48 bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all"
                           onClick={() => setSelectedImage({
                             id: photo.id,
                             url: photo.localPath || `/api/images/generated/${photo.id}`,
                             prompt: photo.prompt
                           })}
-                          className="flex-1 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"
                         >
-                          <Eye className="w-4 h-4" />
-                          Voir
-                        </button>
-                        <button
-                          onClick={() => setSelectedPrompt({ id: photo.id, prompt: photo.prompt })}
-                          className="py-1.5 px-2.5 bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-200 hover:text-gray-700 transition-colors"
-                          title="Voir le prompt"
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
-                      </div>
+                          {/* Badge position dans le carrousel */}
+                          <span className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full z-10 font-medium">
+                            {(photo.carouselIndex || 0) + 1}/{photo.carouselTotal}
+                          </span>
 
-                      {/* Bouton télécharger */}
-                      <button
-                        onClick={() => handleDownload(photo)}
-                        className="w-full py-1.5 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-1"
-                      >
-                        <Download className="w-4 h-4" />
-                        Télécharger
-                      </button>
-                    </div>
+                          {/* Checkbox de selection */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleSelection(photo.id)
+                            }}
+                            className={`absolute top-2 right-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all z-10 ${
+                              selectedIds.has(photo.id)
+                                ? 'bg-blue-500 border-blue-500 text-white'
+                                : 'bg-white/80 border-gray-300 hover:border-blue-400'
+                            }`}
+                          >
+                            {selectedIds.has(photo.id) && (
+                              <Check className="w-3 h-3" strokeWidth={3} />
+                            )}
+                          </button>
+
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.localPath || `/api/images/generated/${photo.id}`}
+                            alt={`Carrousel photo ${(photo.carouselIndex || 0) + 1}`}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        </div>
+
+                        {/* Boutons sous l'image */}
+                        <div className="flex gap-1 mt-2">
+                          <button
+                            onClick={() => setSelectedPrompt({ id: photo.id, prompt: photo.prompt })}
+                            className="flex-1 py-1 bg-gray-100 text-gray-600 rounded text-xs hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"
+                            title="Voir le prompt"
+                          >
+                            <FileText className="w-3 h-3" />
+                            Prompt
+                          </button>
+                          <button
+                            onClick={() => handleDownload(photo)}
+                            className="py-1 px-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors"
+                            title="Telecharger"
+                          >
+                            <Download className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
-            </div>
+
+              {/* Affichage des photos individuelles */}
+              {groupedPhotos.singles.length > 0 && (
+                <div className="grid grid-cols-2 gap-4">
+                  {groupedPhotos.singles.map((photo) => (
+                    <div
+                      key={photo.id}
+                      className={`bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-all ${
+                        selectedIds.has(photo.id)
+                          ? 'border-blue-500 ring-2 ring-blue-200'
+                          : 'border-gray-100'
+                      }`}
+                    >
+                      <div className="aspect-square relative bg-gray-100">
+                        {/* Checkbox de selection */}
+                        <div className="absolute top-2 left-2 z-10">
+                          <button
+                            onClick={() => toggleSelection(photo.id)}
+                            className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
+                              selectedIds.has(photo.id)
+                                ? 'bg-blue-500 border-blue-500 text-white'
+                                : 'bg-white/80 border-gray-300 hover:border-blue-400'
+                            }`}
+                          >
+                            {selectedIds.has(photo.id) && (
+                              <Check className="w-4 h-4" strokeWidth={3} />
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Badge genere */}
+                        <div className="absolute top-2 right-2 z-10">
+                          <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
+                            Generee
+                          </span>
+                        </div>
+
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={photo.localPath || `/api/images/generated/${photo.id}`}
+                          alt="Photo generee"
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="p-3">
+                        <p className="text-xs text-gray-400">
+                          {new Intl.DateTimeFormat('fr-FR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }).format(new Date(photo.createdAt))}
+                        </p>
+
+                        <div className="mt-2 space-y-2">
+                          {/* Bouton voir la photo + prompt */}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setSelectedImage({
+                                id: photo.id,
+                                url: photo.localPath || `/api/images/generated/${photo.id}`,
+                                prompt: photo.prompt
+                              })}
+                              className="flex-1 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"
+                            >
+                              <Eye className="w-4 h-4" />
+                              Voir
+                            </button>
+                            <button
+                              onClick={() => setSelectedPrompt({ id: photo.id, prompt: photo.prompt })}
+                              className="py-1.5 px-2.5 bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-200 hover:text-gray-700 transition-colors"
+                              title="Voir le prompt"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Bouton telecharger */}
+                          <button
+                            onClick={() => handleDownload(photo)}
+                            className="w-full py-1.5 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-1"
+                          >
+                            <Download className="w-4 h-4" />
+                            Telecharger
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -356,7 +510,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={selectedImage.url}
-              alt="Photo générée"
+              alt="Photo generee"
               className="max-w-full max-h-[80vh] object-contain rounded-lg mx-auto"
             />
 
@@ -380,7 +534,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                 className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
-                Télécharger
+                Telecharger
               </button>
             </div>
           </div>
@@ -392,7 +546,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Prompt utilisé</h3>
+              <h3 className="text-lg font-semibold">Prompt utilise</h3>
               <button
                 onClick={() => setSelectedPrompt(null)}
                 className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
@@ -430,7 +584,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
         onClose={() => setDeleteModal({ isOpen: false, photoIds: [] })}
         onConfirm={handleDeleteSelected}
         title={deleteModal.photoIds.length > 1 ? 'Supprimer ces photos ?' : 'Supprimer cette photo ?'}
-        message={`Voulez-vous vraiment supprimer ${deleteModal.photoIds.length > 1 ? `ces ${deleteModal.photoIds.length} photos générées` : 'cette photo générée'} ? Cette action est irréversible.`}
+        message={`Voulez-vous vraiment supprimer ${deleteModal.photoIds.length > 1 ? `ces ${deleteModal.photoIds.length} photos generees` : 'cette photo generee'} ? Cette action est irreversible.`}
         confirmText="Supprimer"
         variant="danger"
         isLoading={isDeleting}

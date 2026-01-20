@@ -67,6 +67,11 @@ export default async function Home() {
     localPath: p.localPath,
     status: p.status,
     createdAt: p.createdAt.toISOString(),
+    // Champs carrousel
+    isCarousel: p.isCarousel,
+    carouselId: p.carouselId,
+    carouselIndex: p.carouselIndex,
+    carouselTotal: p.carouselTotal,
     source: p.source
   }))
 
@@ -75,6 +80,11 @@ export default async function Home() {
     prompt: p.prompt,
     localPath: p.localPath,
     createdAt: p.createdAt.toISOString(),
+    // Champs carrousel
+    isCarousel: p.isCarousel,
+    carouselId: p.carouselId,
+    carouselIndex: p.carouselIndex,
+    carouselTotal: p.carouselTotal,
     sourcePhoto: p.sourcePhoto
   }))
 

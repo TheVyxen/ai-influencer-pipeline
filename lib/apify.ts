@@ -11,12 +11,17 @@ import prisma from './prisma'
 
 /**
  * Structure d'une photo Instagram scrapée par Apify
+ * Supporte les images individuelles et les carrousels
  */
 export interface ApifyPhoto {
-  url: string           // URL de l'image
-  postUrl: string       // URL du post Instagram
-  timestamp: string     // Date du post
-  caption?: string      // Légende du post
+  url: string              // URL de l'image
+  postUrl: string          // URL du post Instagram
+  timestamp: string        // Date du post
+  caption?: string         // Légende du post
+  isCarousel: boolean      // true si fait partie d'un carrousel
+  carouselId?: string      // ID unique du carrousel (pour regrouper)
+  carouselIndex?: number   // Position dans le carrousel (0, 1, 2...)
+  carouselTotal?: number   // Nombre total d'images dans le carrousel
 }
 
 /**
@@ -123,31 +128,46 @@ export async function scrapeInstagramProfile(
     const photos: ApifyPhoto[] = []
 
     for (const item of items) {
-      // Chaque item peut contenir une image ou plusieurs (carrousel)
-      const imageUrls: string[] = []
+      const postUrl = (item.url as string) || `https://www.instagram.com/p/${item.shortCode}/`
+      const timestamp = (item.timestamp as string) || new Date().toISOString()
+      const caption = item.caption as string | undefined
+      const postId = (item.id as string) || (item.shortCode as string)
 
-      // Image principale
-      if (item.displayUrl) {
-        imageUrls.push(item.displayUrl as string)
-      }
+      // Vérifier si c'est un carrousel (plus d'une image)
+      if (item.images && Array.isArray(item.images) && item.images.length > 1) {
+        // C'est un carrousel - récupérer toutes les images avec leurs métadonnées
+        const validImages = item.images.filter((img: unknown) => img && typeof img === 'string') as string[]
 
-      // Images du carrousel
-      if (item.images && Array.isArray(item.images)) {
-        for (const img of item.images) {
-          if (img && typeof img === 'string') {
-            imageUrls.push(img)
-          }
-        }
-      }
-
-      // Créer une entrée pour chaque image
-      for (const url of imageUrls) {
-        photos.push({
-          url,
-          postUrl: (item.url as string) || `https://www.instagram.com/p/${item.shortCode}/`,
-          timestamp: (item.timestamp as string) || new Date().toISOString(),
-          caption: item.caption as string | undefined,
+        validImages.forEach((imageUrl: string, index: number) => {
+          photos.push({
+            url: imageUrl,
+            postUrl,
+            timestamp,
+            caption,
+            isCarousel: true,
+            carouselId: postId,
+            carouselIndex: index,
+            carouselTotal: validImages.length,
+          })
         })
+      } else {
+        // Image unique (pas un carrousel ou carrousel avec une seule image)
+        let imageUrl = item.displayUrl as string | undefined
+
+        // Si pas de displayUrl, essayer de récupérer la première image du tableau
+        if (!imageUrl && Array.isArray(item.images) && item.images.length > 0) {
+          imageUrl = item.images[0] as string
+        }
+
+        if (imageUrl) {
+          photos.push({
+            url: imageUrl,
+            postUrl,
+            timestamp,
+            caption,
+            isCarousel: false,
+          })
+        }
       }
     }
 
@@ -218,7 +238,7 @@ export async function scrapeMultipleProfiles(
 
 /**
  * Importe une photo scrapée dans la base de données
- * Vérifie les doublons via instagramPostUrl
+ * Vérifie les doublons via instagramPostUrl + carouselIndex
  * NOTE: Les images ne sont pas téléchargées - on utilise directement originalUrl
  * @param sourceId - ID de la source Instagram
  * @param photo - Données de la photo scrapée
@@ -228,17 +248,23 @@ export async function importScrapedPhoto(
   sourceId: string,
   photo: ApifyPhoto
 ): Promise<{ id: string; originalUrl: string; status: string } | null> {
-  // Vérifier si cette photo existe déjà (doublon)
-  const existing = await prisma.sourcePhoto.findUnique({
-    where: { instagramPostUrl: photo.postUrl }
+  // Vérifier si cette photo existe déjà (doublon basé sur postUrl + carouselIndex)
+  const carouselIndexValue = photo.carouselIndex ?? null
+
+  const existing = await prisma.sourcePhoto.findFirst({
+    where: {
+      instagramPostUrl: photo.postUrl,
+      carouselIndex: carouselIndexValue,
+    }
   })
 
   if (existing) {
     // Photo déjà importée, retourner null
+    console.log(`Photo déjà importée: ${photo.postUrl} [index: ${carouselIndexValue}]`)
     return null
   }
 
-  // Créer l'entrée dans la base de données
+  // Créer l'entrée dans la base de données avec les infos carrousel
   // NOTE: localPath n'est plus utilisé sur Vercel, on garde originalUrl
   const sourcePhoto = await prisma.sourcePhoto.create({
     data: {
@@ -248,6 +274,11 @@ export async function importScrapedPhoto(
       instagramPostUrl: photo.postUrl,
       status: 'pending',
       description: photo.caption?.substring(0, 500) || null, // Limiter la description
+      // Champs carrousel
+      isCarousel: photo.isCarousel,
+      carouselId: photo.carouselId || null,
+      carouselIndex: photo.carouselIndex ?? null,
+      carouselTotal: photo.carouselTotal || null,
     }
   })
 

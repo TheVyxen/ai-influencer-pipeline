@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import toast from 'react-hot-toast'
-import { Clock, Upload, Check, X, CheckSquare, Square, XSquare, Loader2 } from 'lucide-react'
+import { Clock, Upload, Check, X, CheckSquare, Square, XSquare, Loader2, Layers, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
 
@@ -14,6 +14,11 @@ interface PendingPhoto {
   localPath: string | null
   status: string
   createdAt: string
+  // Champs carrousel
+  isCarousel: boolean
+  carouselId: string | null
+  carouselIndex: number | null
+  carouselTotal: number | null
   source: {
     username: string
   }
@@ -53,6 +58,82 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
     isOpen: false,
     photoIds: [],
   })
+
+  // État pour la modal d'aperçu (clic sur image pour agrandir)
+  const [previewModal, setPreviewModal] = useState<{
+    isOpen: boolean
+    imageUrl: string | null
+    allImages: string[]  // Pour la navigation entre images
+    currentIndex: number
+  }>({
+    isOpen: false,
+    imageUrl: null,
+    allImages: [],
+    currentIndex: 0,
+  })
+
+  // État pour suivre le carrousel en cours de traitement
+  const [processingCarouselId, setProcessingCarouselId] = useState<string | null>(null)
+
+  /**
+   * Ouvre la modal d'aperçu pour une image
+   * Prend en charge la navigation entre toutes les images ou un sous-ensemble (carrousel)
+   */
+  const openPreview = useCallback((imageUrl: string, imageSet?: string[]) => {
+    // Si on passe un set d'images (carrousel), utiliser celui-ci
+    // Sinon utiliser toutes les images disponibles
+    const allImages = imageSet || photos.map(p => p.localPath || p.originalUrl)
+    const currentIndex = allImages.indexOf(imageUrl)
+
+    setPreviewModal({
+      isOpen: true,
+      imageUrl,
+      allImages,
+      currentIndex: currentIndex >= 0 ? currentIndex : 0,
+    })
+  }, [photos])
+
+  /**
+   * Navigation dans la modal d'aperçu
+   */
+  const navigatePreview = useCallback((direction: 'prev' | 'next') => {
+    setPreviewModal(prev => {
+      if (!prev.isOpen || prev.allImages.length <= 1) return prev
+
+      let newIndex = prev.currentIndex
+      if (direction === 'prev') {
+        newIndex = prev.currentIndex > 0 ? prev.currentIndex - 1 : prev.allImages.length - 1
+      } else {
+        newIndex = prev.currentIndex < prev.allImages.length - 1 ? prev.currentIndex + 1 : 0
+      }
+
+      return {
+        ...prev,
+        currentIndex: newIndex,
+        imageUrl: prev.allImages[newIndex],
+      }
+    })
+  }, [])
+
+  // Regrouper les photos par carrousel
+  const groupedPhotos = useMemo(() => {
+    const groups: Map<string, PendingPhoto[]> = new Map()
+    const singles: PendingPhoto[] = []
+
+    photos.forEach(photo => {
+      if (photo.isCarousel && photo.carouselId) {
+        const existing = groups.get(photo.carouselId) || []
+        existing.push(photo)
+        groups.set(photo.carouselId, existing.sort((a, b) =>
+          (a.carouselIndex || 0) - (b.carouselIndex || 0)
+        ))
+      } else {
+        singles.push(photo)
+      }
+    })
+
+    return { groups, singles }
+  }, [photos])
 
   // Toggle sélection d'une photo
   const toggleSelection = (id: string) => {
@@ -203,8 +284,80 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
     setRejectModal({ isOpen: true, photoIds: Array.from(selectedIds) })
   }
 
+  // Approuver tout le carrousel (workflow complet pour chaque photo)
+  const handleApproveCarousel = async (carouselPhotos: PendingPhoto[]) => {
+    if (carouselPhotos.length === 0) return
+
+    const carouselId = carouselPhotos[0].carouselId
+    setProcessingCarouselId(carouselId)
+
+    const total = carouselPhotos.length
+    const toastId = toast.loading(`Traitement du carrousel (0/${total})...`, { duration: Infinity })
+
+    let successCount = 0
+    let errorCount = 0
+
+    for (let i = 0; i < carouselPhotos.length; i++) {
+      const photo = carouselPhotos[i]
+      toast.loading(`Traitement du carrousel (${i + 1}/${total})...`, { id: toastId })
+
+      try {
+        const res = await fetch(`/api/photos/${photo.id}/approve`, {
+          method: 'PATCH'
+        })
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Échec du traitement')
+        }
+
+        setPhotos(prev => prev.filter(p => p.id !== photo.id))
+        setSelectedIds(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(photo.id)
+          return newSet
+        })
+        successCount++
+      } catch (err) {
+        errorCount++
+        console.error('Error in carousel approve workflow:', err)
+      }
+    }
+
+    setProcessingCarouselId(null)
+
+    if (successCount > 0 && errorCount === 0) {
+      toast.success(`Carrousel validé et généré (${successCount} photos) !`, { id: toastId })
+      router.refresh()
+    } else if (successCount > 0) {
+      toast.success(`${successCount} photo(s) traitée(s), ${errorCount} erreur(s)`, { id: toastId })
+      router.refresh()
+    } else {
+      toast.error(`Échec du traitement du carrousel`, { id: toastId })
+    }
+  }
+
+  // Rejeter tout le carrousel (ouvre la modal de confirmation)
+  const handleRejectCarousel = (carouselPhotos: PendingPhoto[]) => {
+    if (carouselPhotos.length === 0) return
+    setRejectModal({ isOpen: true, photoIds: carouselPhotos.map(p => p.id) })
+  }
+
   // Raccourcis clavier
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Gestion de la modal d'aperçu
+    if (previewModal.isOpen) {
+      if (e.key === 'Escape') {
+        setPreviewModal({ isOpen: false, imageUrl: null, allImages: [], currentIndex: 0 })
+      } else if (e.key === 'ArrowLeft') {
+        navigatePreview('prev')
+      } else if (e.key === 'ArrowRight') {
+        navigatePreview('next')
+      }
+      return
+    }
+
     if (photos.length === 0) return
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
@@ -222,7 +375,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
         setRejectModal({ isOpen: true, photoIds: [photos[currentPhotoIndex].id] })
       }
     }
-  }, [photos, currentPhotoIndex])
+  }, [photos, currentPhotoIndex, previewModal.isOpen, navigatePreview])
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
@@ -341,106 +494,252 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
           )}
         </div>
 
-        <div className="p-4">
+        <div className="p-4 space-y-4">
           {photos.length === 0 ? (
             <EmptyState
               message="Aucune photo en attente"
               icon={<Clock className="w-12 h-12" />}
             />
           ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {photos.map((photo, index) => (
-                <div
-                  key={photo.id}
-                  className={`bg-white rounded-lg shadow-sm border overflow-hidden transition-all cursor-pointer ${
-                    selectedIds.has(photo.id)
-                      ? 'border-blue-500 ring-2 ring-blue-200'
-                      : index === currentPhotoIndex
-                      ? 'border-purple-400 ring-1 ring-purple-200'
-                      : 'border-gray-100 hover:shadow-md'
-                  }`}
-                  onClick={() => setCurrentPhotoIndex(index)}
-                >
-                  <div className="aspect-square relative bg-gray-100">
-                    {/* Overlay de traitement */}
-                    {processingId === photo.id && (
-                      <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center z-20">
-                        <Loader2 className="w-8 h-8 text-white animate-spin" />
-                        <span className="text-white text-xs mt-2 font-medium">Génération...</span>
+            <>
+              {/* Affichage des carrousels groupés */}
+              {Array.from(groupedPhotos.groups.entries()).map(([carouselId, carouselPhotos]) => {
+                // Préparer les URLs des images du carrousel pour la navigation
+                const carouselImageUrls = carouselPhotos.map(p => p.localPath || p.originalUrl)
+
+                return (
+                  <div
+                    key={carouselId}
+                    className={`border-2 border-blue-200 rounded-xl p-4 bg-blue-50/50 ${
+                      processingCarouselId === carouselId ? 'opacity-75' : ''
+                    }`}
+                  >
+                    {/* En-tête du carrousel */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm font-medium text-blue-700">
+                          Carrousel ({carouselPhotos.length} photos)
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          @{carouselPhotos[0]?.source.username}
+                        </span>
                       </div>
-                    )}
-
-                    {/* Checkbox de sélection */}
-                    <div className="absolute top-2 left-2 z-10">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleSelection(photo.id)
-                        }}
-                        disabled={processingId !== null}
-                        className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
-                          selectedIds.has(photo.id)
-                            ? 'bg-blue-500 border-blue-500 text-white'
-                            : 'bg-white/80 border-gray-300 hover:border-blue-400'
-                        } disabled:opacity-50`}
-                      >
-                        {selectedIds.has(photo.id) && (
-                          <Check className="w-4 h-4" strokeWidth={3} />
-                        )}
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApproveCarousel(carouselPhotos)}
+                          disabled={processingCarouselId !== null || processingId !== null || isProcessing}
+                          className="px-3 py-1.5 text-xs font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                        >
+                          {processingCarouselId === carouselId ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Check className="w-3 h-3" />
+                          )}
+                          Valider tout
+                        </button>
+                        <button
+                          onClick={() => handleRejectCarousel(carouselPhotos)}
+                          disabled={processingCarouselId !== null || processingId !== null || isProcessing}
+                          className="px-3 py-1.5 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                        >
+                          <X className="w-3 h-3" />
+                          Rejeter tout
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Badge pending */}
-                    <div className="absolute top-2 right-2 z-10">
-                      <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
-                        En attente
-                      </span>
-                    </div>
+                    {/* Images du carrousel en scroll horizontal */}
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                      {carouselPhotos.map((photo) => (
+                        <div key={photo.id} className="relative flex-shrink-0 w-32">
+                          <div
+                            className="relative w-32 h-40 bg-gray-100 rounded-lg overflow-hidden cursor-pointer group"
+                            onClick={() => openPreview(photo.localPath || photo.originalUrl, carouselImageUrls)}
+                          >
+                            {/* Overlay de traitement */}
+                            {processingId === photo.id && (
+                              <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center z-20">
+                                <Loader2 className="w-6 h-6 text-white animate-spin" />
+                              </div>
+                            )}
 
-                    <Image
-                      src={photo.localPath || photo.originalUrl}
-                      alt="Photo à valider"
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 50vw, 200px"
-                    />
+                            {/* Overlay hover pour zoom */}
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-all z-10">
+                              <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+
+                            {/* Badge position dans le carrousel */}
+                            <span className="absolute top-1.5 left-1.5 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full z-10 font-medium">
+                              {(photo.carouselIndex || 0) + 1}/{photo.carouselTotal}
+                            </span>
+
+                            {/* Checkbox de sélection */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleSelection(photo.id)
+                              }}
+                              disabled={processingId !== null || processingCarouselId !== null}
+                              className={`absolute top-1.5 right-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all z-10 ${
+                                selectedIds.has(photo.id)
+                                  ? 'bg-blue-500 border-blue-500 text-white'
+                                  : 'bg-white/80 border-gray-300 hover:border-blue-400'
+                              } disabled:opacity-50`}
+                            >
+                              {selectedIds.has(photo.id) && (
+                                <Check className="w-3 h-3" strokeWidth={3} />
+                              )}
+                            </button>
+
+                            <Image
+                              src={photo.localPath || photo.originalUrl}
+                              alt={`Carrousel photo ${(photo.carouselIndex || 0) + 1}`}
+                              fill
+                              className="object-cover"
+                              sizes="128px"
+                            />
+                          </div>
+
+                          {/* Boutons individuels */}
+                          <div className="flex gap-1 mt-1.5">
+                            <button
+                              onClick={() => handleApprove(photo.id)}
+                              disabled={processingId !== null || processingCarouselId !== null || isProcessing}
+                              className={`flex-1 py-1.5 text-white rounded-lg transition-colors flex items-center justify-center ${
+                                processingId === photo.id
+                                  ? 'bg-green-400 cursor-wait'
+                                  : 'bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed'
+                              }`}
+                            >
+                              {processingId === photo.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Check className="w-3 h-3" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => setRejectModal({ isOpen: true, photoIds: [photo.id] })}
+                              disabled={processingId !== null || processingCarouselId !== null || isProcessing}
+                              className="flex-1 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="p-3">
-                    <p className="text-xs text-gray-500 truncate">@{photo.source.username}</p>
-                    <div className="mt-2 flex gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleApprove(photo.id)
+                )
+              })}
+
+              {/* Affichage des photos individuelles */}
+              {groupedPhotos.singles.length > 0 && (
+                <div className="grid grid-cols-2 gap-4">
+                  {groupedPhotos.singles.map((photo, index) => (
+                    <div
+                      key={photo.id}
+                      className={`bg-white rounded-lg shadow-sm border overflow-hidden transition-all ${
+                        selectedIds.has(photo.id)
+                          ? 'border-blue-500 ring-2 ring-blue-200'
+                          : index === currentPhotoIndex
+                          ? 'border-purple-400 ring-1 ring-purple-200'
+                          : 'border-gray-100 hover:shadow-md'
+                      }`}
+                    >
+                      <div
+                        className="aspect-square relative bg-gray-100 cursor-pointer group"
+                        onClick={() => {
+                          setCurrentPhotoIndex(index)
+                          openPreview(photo.localPath || photo.originalUrl)
                         }}
-                        disabled={processingId !== null || isProcessing}
-                        className={`flex-1 py-1.5 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1 ${
-                          processingId === photo.id
-                            ? 'bg-green-400 cursor-wait'
-                            : 'bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed'
-                        }`}
                       >
-                        {processingId === photo.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Check className="w-4 h-4" />
+                        {/* Overlay de traitement */}
+                        {processingId === photo.id && (
+                          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center z-20">
+                            <Loader2 className="w-8 h-8 text-white animate-spin" />
+                            <span className="text-white text-xs mt-2 font-medium">Génération...</span>
+                          </div>
                         )}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setRejectModal({ isOpen: true, photoIds: [photo.id] })
-                        }}
-                        disabled={processingId !== null || isProcessing}
-                        className="flex-1 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+
+                        {/* Overlay hover pour zoom */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-all z-10 pointer-events-none">
+                          <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+
+                        {/* Checkbox de sélection */}
+                        <div className="absolute top-2 left-2 z-20">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleSelection(photo.id)
+                            }}
+                            disabled={processingId !== null}
+                            className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
+                              selectedIds.has(photo.id)
+                                ? 'bg-blue-500 border-blue-500 text-white'
+                                : 'bg-white/80 border-gray-300 hover:border-blue-400'
+                            } disabled:opacity-50`}
+                          >
+                            {selectedIds.has(photo.id) && (
+                              <Check className="w-4 h-4" strokeWidth={3} />
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Badge pending */}
+                        <div className="absolute top-2 right-2 z-20">
+                          <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded-full">
+                            En attente
+                          </span>
+                        </div>
+
+                        <Image
+                          src={photo.localPath || photo.originalUrl}
+                          alt="Photo à valider"
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 50vw, 200px"
+                        />
+                      </div>
+                      <div className="p-3">
+                        <p className="text-xs text-gray-500 truncate">@{photo.source.username}</p>
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleApprove(photo.id)
+                            }}
+                            disabled={processingId !== null || isProcessing}
+                            className={`flex-1 py-1.5 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1 ${
+                              processingId === photo.id
+                                ? 'bg-green-400 cursor-wait'
+                                : 'bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed'
+                            }`}
+                          >
+                            {processingId === photo.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setRejectModal({ isOpen: true, photoIds: [photo.id] })
+                            }}
+                            disabled={processingId !== null || isProcessing}
+                            className="flex-1 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -519,6 +818,73 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
         variant="danger"
         isLoading={isProcessing}
       />
+
+      {/* Modal d'aperçu d'image (plein écran) */}
+      {previewModal.isOpen && previewModal.imageUrl && (
+        <div
+          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50"
+          onClick={() => setPreviewModal({ isOpen: false, imageUrl: null, allImages: [], currentIndex: 0 })}
+        >
+          {/* Bouton fermer */}
+          <button
+            onClick={() => setPreviewModal({ isOpen: false, imageUrl: null, allImages: [], currentIndex: 0 })}
+            className="absolute top-4 right-4 bg-white/20 hover:bg-white/40 rounded-full p-2 transition-colors z-10"
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+
+          {/* Navigation précédent */}
+          {previewModal.allImages.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigatePreview('prev')
+              }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 rounded-full p-2 transition-colors z-10"
+            >
+              <ChevronLeft className="w-8 h-8 text-white" />
+            </button>
+          )}
+
+          {/* Image */}
+          <div
+            className="relative max-w-[90vw] max-h-[90vh] flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewModal.imageUrl}
+              alt="Aperçu"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+            />
+
+            {/* Indicateur de position */}
+            {previewModal.allImages.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1.5 rounded-full">
+                {previewModal.currentIndex + 1} / {previewModal.allImages.length}
+              </div>
+            )}
+          </div>
+
+          {/* Navigation suivant */}
+          {previewModal.allImages.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigatePreview('next')
+              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/40 rounded-full p-2 transition-colors z-10"
+            >
+              <ChevronRight className="w-8 h-8 text-white" />
+            </button>
+          )}
+
+          {/* Aide clavier */}
+          <div className="absolute bottom-4 right-4 text-white/50 text-xs">
+            Échap pour fermer • ← → pour naviguer
+          </div>
+        </div>
+      )}
     </>
   )
 }
