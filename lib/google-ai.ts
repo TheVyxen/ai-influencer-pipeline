@@ -305,18 +305,7 @@ Produis UNIQUEMENT le prompt, sans commentaire ni explication.`
       }
     })
 
-    // Extraire le texte de la réponse
-    const firstPrompt = (firstResponse.candidates?.[0]?.content?.parts?.find(
-      (part: { text?: string }) => part.text
-    )?.text || '').trim()
-
-    if (!firstPrompt || firstPrompt.length === 0) {
-      throw new GoogleAIError(
-        'Impossible d\'analyser la première image',
-        'INVALID_IMAGE'
-      )
-    }
-
+    const firstPrompt = (firstResponse.text || '').trim()
     prompts.push(firstPrompt)
     console.log('First prompt generated:', firstPrompt.substring(0, 100) + '...')
 
@@ -375,9 +364,7 @@ Je t'envoie ${imageBuffers.length - 1} image(s). Génère un prompt pour chacune
       }
     })
 
-    const remainingText = (remainingResponse.candidates?.[0]?.content?.parts?.find(
-      (part: { text?: string }) => part.text
-    )?.text || '').trim()
+    const remainingText = (remainingResponse.text || '').trim()
 
     // Parser les prompts séparés par ---NEXT---
     const remainingPrompts = remainingText
