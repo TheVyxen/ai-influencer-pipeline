@@ -237,8 +237,9 @@ export async function describePhoto(
 }
 
 /**
- * Génère des prompts de description pour un carrousel d'images via Gemini 3 Pro Vision
- * Envoie toutes les images en une seule requête et reçoit un prompt par image
+ * Décrit un carrousel de photos avec deux appels API pour garantir la cohérence
+ * Appel 1 : Première image → prompt complet (décor + pose)
+ * Appel 2 : Images suivantes + contexte du prompt 1 → uniquement les poses
  * @param imageBuffers - Tableau de Buffers des images à analyser
  * @returns Tableau de prompts (un par image)
  */
@@ -258,68 +259,149 @@ export async function describeCarouselPhotos(
     return []
   }
 
-  // Si une seule image, utiliser la fonction standard
-  if (imageBuffers.length === 1) {
-    const prompt = await describePhoto(imageBuffers[0])
-    return [prompt]
-  }
+  const prompts: string[] = []
 
   try {
     const ai = new GoogleGenAI({ apiKey })
 
-    // Créer les parts pour chaque image
-    const imageParts = imageBuffers.map(buffer => ({
+    // ========== APPEL 1 : Première image (prompt complet) ==========
+
+    const firstImagePrompt = `Tu es un expert en prompt engineering pour la génération d'images photo-réalistes.
+
+RÈGLE ABSOLUE : Ne JAMAIS décrire le physique de la personne (visage, corps, âge, morphologie, couleur de peau).
+
+Génère UN SEUL prompt complet et détaillé pour cette image. Le prompt doit décrire :
+- L'environnement complet (lieu, décor, objets, textures, couleurs)
+- La position et posture exactes du corps
+- L'angle de prise de vue
+- La tenue complète (vêtements, matières, couleurs, accessoires)
+- L'éclairage (source, direction, ambiance)
+
+Commence OBLIGATOIREMENT par : "Preserve the identity of the person from the input image."
+Termine par : "Ultra-realistic, high resolution, sharp focus, natural depth. No filters, no stylization, no beauty effects."
+
+Ne jamais mentionner de téléphone, flash, ou lumière de téléphone.
+Produis UNIQUEMENT le prompt, sans commentaire ni explication.`
+
+    const firstImagePart = {
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: imageBuffers[0].toString('base64')
+      }
+    }
+
+    console.log('Generating prompt for first image...')
+
+    const firstResponse = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: [{
+        parts: [
+          { text: firstImagePrompt },
+          firstImagePart
+        ]
+      }],
+      config: {
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+      }
+    })
+
+    // Extraire le texte de la réponse
+    const firstPrompt = (firstResponse.candidates?.[0]?.content?.parts?.find(
+      (part: { text?: string }) => part.text
+    )?.text || '').trim()
+
+    if (!firstPrompt || firstPrompt.length === 0) {
+      throw new GoogleAIError(
+        'Impossible d\'analyser la première image',
+        'INVALID_IMAGE'
+      )
+    }
+
+    prompts.push(firstPrompt)
+    console.log('First prompt generated:', firstPrompt.substring(0, 100) + '...')
+
+    // Si une seule image, on a fini
+    if (imageBuffers.length === 1) {
+      return prompts
+    }
+
+    // ========== APPEL 2 : Images suivantes (uniquement les poses) ==========
+
+    const remainingImagesPrompt = `Tu es un expert en prompt engineering pour la génération d'images photo-réalistes.
+
+CONTEXTE : Voici le prompt complet de la PREMIÈRE image d'un carrousel :
+"""
+${firstPrompt}
+"""
+
+TÂCHE : Pour chaque image suivante que je te donne, génère un prompt COURT qui :
+1. Garde TOUT identique (environnement, éclairage, vêtements, accessoires, angle)
+2. Change UNIQUEMENT la position/pose du corps
+
+FORMAT OBLIGATOIRE pour chaque prompt :
+"Preserve the identity of the person from the input image. Maintain the exact same environment, lighting, outfit, accessories, and camera angle from the first image. Everything remains identical except the pose.
+
+New pose: [DÉCRIS LA NOUVELLE POSE EN 1-2 PHRASES].
+
+Same setting, same lighting, same outfit. Ultra-realistic."
+
+RÈGLES :
+- Chaque prompt fait MAXIMUM 6 lignes
+- Ne JAMAIS re-décrire le décor, les vêtements, ou l'éclairage
+- Sépare chaque prompt par "---NEXT---" sur une ligne seule
+- Produis UNIQUEMENT les prompts, sans commentaire
+
+Je t'envoie ${imageBuffers.length - 1} image(s). Génère un prompt pour chacune.`
+
+    const remainingImageParts = imageBuffers.slice(1).map(buffer => ({
       inlineData: {
         mimeType: 'image/jpeg',
         data: buffer.toString('base64')
       }
     }))
 
-    const response = await ai.models.generateContent({
+    console.log(`Generating prompts for ${remainingImageParts.length} remaining images...`)
+
+    const remainingResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: [
-        {
-          parts: [
-            { text: CAROUSEL_SYSTEM_PROMPT },
-            ...imageParts
-          ]
-        }
-      ],
+      contents: [{
+        parts: [
+          { text: remainingImagesPrompt },
+          ...remainingImageParts
+        ]
+      }],
       config: {
-        thinkingConfig: {
-          thinkingLevel: ThinkingLevel.LOW
-        }
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
       }
     })
 
-    // Extraire le texte de la réponse
-    const fullText = response.candidates?.[0]?.content?.parts?.find(
+    const remainingText = (remainingResponse.candidates?.[0]?.content?.parts?.find(
       (part: { text?: string }) => part.text
-    )?.text || ''
+    )?.text || '').trim()
 
-    if (!fullText || fullText.trim().length === 0) {
-      throw new GoogleAIError(
-        'Impossible d\'analyser ces images',
-        'INVALID_IMAGE'
-      )
-    }
-
-    // Séparer les prompts par le délimiteur
-    const prompts = fullText
+    // Parser les prompts séparés par ---NEXT---
+    const remainingPrompts = remainingText
       .split('---NEXT---')
       .map(p => p.trim())
       .filter(p => p.length > 0)
 
-    // Vérifier qu'on a au moins autant de prompts que d'images
-    if (prompts.length < imageBuffers.length) {
-      console.warn(`Carousel: received ${prompts.length} prompts for ${imageBuffers.length} images`)
-      // Compléter avec des copies du dernier prompt si nécessaire
+    console.log(`Generated ${remainingPrompts.length} remaining prompts`)
+
+    // Ajouter les prompts restants
+    prompts.push(...remainingPrompts)
+
+    // Vérifier qu'on a le bon nombre
+    if (prompts.length !== imageBuffers.length) {
+      console.warn(`Warning: ${prompts.length} prompts for ${imageBuffers.length} images`)
+      // Compléter avec des duplications du dernier prompt si nécessaire
       while (prompts.length < imageBuffers.length) {
-        prompts.push(prompts[prompts.length - 1] || 'Preserve the identity of the person from the input image.')
+        const lastPose = prompts[prompts.length - 1]
+        prompts.push(lastPose)
       }
     }
 
-    return prompts.slice(0, imageBuffers.length)
+    return prompts
+
   } catch (error) {
     // Gérer les erreurs spécifiques
     if (error instanceof GoogleAIError) {
