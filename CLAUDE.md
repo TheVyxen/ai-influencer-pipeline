@@ -188,6 +188,22 @@ Le prompt décrit :
 
 Le prompt ne décrit JAMAIS le physique de la personne (visage, corps, etc.)
 
+### Description des carrousels
+Pour les posts Instagram avec plusieurs images (carrousels), la logique est différente :
+
+**Image 1** : Description complète (environnement, tenue, éclairage, pose, style)
+```
+Preserve the identity of the person from the input image. Ultra-realistic outdoor scene...
+[description détaillée sur 15-20 lignes]
+```
+
+**Images 2+** : Format court, uniquement le changement de pose
+```
+Preserve the identity of the person from the input image. Same scene, same outfit, same lighting, same environment. Only the pose changes: [description de la pose en 1-2 phrases]. Ultra-realistic, identical setting preserved.
+```
+
+**Implémentation** : Appels API individuels pour chaque image (pas de batch) pour garantir la fiabilité du format
+
 ### Photo de référence
 - Une seule photo de référence pour la modèle
 - Stockée dans /public/reference/model.jpg
