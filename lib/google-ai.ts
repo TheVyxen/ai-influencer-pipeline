@@ -63,51 +63,6 @@ Comportement attendu.
 Tu produis uniquement le prompt, sans commentaire, sans explication, sans introduction. Juste le prompt prêt à l'emploi.`
 
 /**
- * Prompt système pour Gemini - description de carrousels (plusieurs images)
- * Génère un prompt par image, séparés par "---NEXT---"
- * Prompt 1 = description complète, Prompts 2+ = seulement changement de pose
- */
-const CAROUSEL_SYSTEM_PROMPT = `Tu es un expert en prompt engineering pour la génération d'images photo-réalistes.
-
-RÈGLE ABSOLUE : Tu ne décris JAMAIS le physique de la personne (visage, corps, âge, morphologie, couleur de peau). Tu insistes sur le fait qu'il s'agit de la même personne que sur l'image d'entrée.
-
-CHAQUE PROMPT COMMENCE PAR : "Preserve the identity of the person from the input image."
-
-FORMAT DE SORTIE : Sépare chaque prompt par "---NEXT---" sur une ligne seule. Ne produis QUE les prompts, rien d'autre.
-
-GESTION DES SÉRIES D'IMAGES (CARROUSELS) :
-
-PROMPT 1 (première image) — DESCRIPTION COMPLÈTE :
-Tu décris avec précision :
-- L'environnement complet (lieu, décor, objets, textures, couleurs)
-- La position et posture exactes du corps
-- L'angle de prise de vue (selfie, perspective, cadrage)
-- La tenue complète (vêtements, matières, couleurs, accessoires)
-- L'éclairage (source, direction, ambiance)
-- Le style (ultra-réaliste, lifestyle, qualité)
-Termine par : "Ultra-realistic, high resolution, sharp focus, natural depth. No filters, no stylization, no beauty effects."
-
-PROMPTS 2, 3, 4... (images suivantes) — UNIQUEMENT LE CHANGEMENT DE POSE :
-Ces prompts doivent être COURTS et suivre ce format EXACT :
-
-"Preserve the identity of the person from the input image. Keep the exact same environment, background, lighting, outfit, accessories, color palette, camera angle, and atmosphere. All décor and textures must remain strictly unchanged.
-
-Change only the body position: [DÉCRIRE LA NOUVELLE POSE EN 1-2 PHRASES].
-
-Ultra-realistic, identical setting and lighting preserved."
-
-EXEMPLES DE CHANGEMENTS DE POSE :
-- "The subject is now standing with weight shifted to the left leg, one hand on hip."
-- "The subject is now seated, leaning slightly forward with arms resting on knees."
-- "The subject is now reclining deeper, one arm raised above the head, elbow bent."
-
-IMPORTANT :
-- Ne JAMAIS re-décrire le décor dans les prompts 2+
-- Ne JAMAIS changer les vêtements, accessoires, ou éclairage
-- Les prompts 2+ font maximum 4-5 lignes
-- Utiliser les mots "exact same", "strictly unchanged", "identical" pour insister sur la cohérence`
-
-/**
  * Vérifie si la clé API Google AI est configurée
  */
 export async function isGoogleAIConfigured(): Promise<boolean> {
@@ -237,9 +192,9 @@ export async function describePhoto(
 }
 
 /**
- * Décrit un carrousel de photos avec deux appels API pour garantir la cohérence
- * Appel 1 : Première image → prompt complet (décor + pose)
- * Appel 2 : Images suivantes + contexte du prompt 1 → uniquement les poses
+ * Décrit un carrousel de photos
+ * Image 1 : Prompt système classique → description complète
+ * Images 2+ : Prompt système différent → format court "Same scene, only change: [pose]"
  * @param imageBuffers - Tableau de Buffers des images à analyser
  * @returns Tableau de prompts (un par image)
  */
@@ -264,40 +219,68 @@ export async function describeCarouselPhotos(
   try {
     const ai = new GoogleGenAI({ apiKey })
 
-    // ========== APPEL 1 : Première image (prompt complet) ==========
+    // ========== PROMPT SYSTÈME POUR IMAGE 1 (complet) ==========
 
-    const firstImagePrompt = `Tu es un expert en prompt engineering pour la génération d'images photo-réalistes.
+    const firstImageSystemPrompt = `Tu es un expert en prompt engineering spécialisé dans la description d'images pour la génération photo-réaliste. Ton rôle unique est de produire des prompts exploitables tels quels pour des générateurs d'images avancés.
 
-RÈGLE ABSOLUE : Ne JAMAIS décrire le physique de la personne (visage, corps, âge, morphologie, couleur de peau).
+Règles fondamentales et non négociables.
+Tu décris toujours précisément tout ce qui n'est pas une caractéristique physique de la fille. Tu ne décris jamais le visage, le corps, l'âge, les traits, la morphologie, la couleur de peau ou tout élément assimilable à une description physique. À la place, tu insistes explicitement sur le fait qu'il s'agit exactement de la même fille que sur l'image d'entrée.
 
-Génère UN SEUL prompt complet et détaillé pour cette image. Le prompt doit décrire :
-- L'environnement complet (lieu, décor, objets, textures, couleurs)
-- La position et posture exactes du corps
-- L'angle de prise de vue
-- La tenue complète (vêtements, matières, couleurs, accessoires)
-- L'éclairage (source, direction, ambiance)
+Chaque prompt commence obligatoirement et exactement par la phrase suivante, sans variation.
+"Preserve the identity of the person from the input image."
 
-Commence OBLIGATOIREMENT par : "Preserve the identity of the person from the input image."
-Termine par : "Ultra-realistic, high resolution, sharp focus, natural depth. No filters, no stylization, no beauty effects."
+Langue et ton.
+Tu écris en anglais pour les prompts de génération d'images. Le ton est professionnel, rigoureux, précis, sans poésie inutile, sans métaphores, sans approximations.
 
-Ne jamais mentionner de téléphone, flash, ou lumière de téléphone.
-Produis UNIQUEMENT le prompt, sans commentaire ni explication.`
+Structure attendue des prompts.
+Tu décris systématiquement, avec un haut niveau de précision.
+Le contexte et l'environnement. Lieu, décor, objets, textures, ambiance.
+La position et la posture. Orientation du corps, angle, appuis, dynamique.
+L'angle de prise de vue. Perspective, hauteur, distance, cadrage.
+La tenue. Vêtements, matières, couleurs, coupe, accessoires visibles.
+Les objets et props présents dans la scène.
+L'ambiance générale. Lifestyle, intimité, énergie, mood.
+Le style photographique. Ultra-réaliste, photo lifestyle, rendu naturel.
+La qualité. Haute résolution, textures réalistes.
 
-    const firstImagePart = {
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: imageBuffers[0].toString('base64')
-      }
-    }
+Contraintes techniques.
+Ne jamais mentionner de téléphone visible, de flash, ni de lumière de téléphone.
+Pas de filtres. Pas de stylisation artistique. Pas d'effets beauté.
+Rendu photo-réaliste uniquement.
 
-    console.log('Generating prompt for first image...')
+Produis uniquement le prompt, sans commentaire.`
+
+    // ========== PROMPT SYSTÈME POUR IMAGES 2+ (pose seulement) ==========
+
+    const followingImageSystemPrompt = `Tu décris UNIQUEMENT la position et la pose du corps dans cette image.
+
+RÈGLE ABSOLUE : Tu ne décris PAS le décor, PAS les vêtements, PAS l'éclairage, PAS l'environnement. SEULEMENT la pose.
+
+Tu ne décris JAMAIS le physique de la personne (visage, corps, âge, morphologie).
+
+FORMAT OBLIGATOIRE - ton prompt doit suivre EXACTEMENT ce format :
+
+"Preserve the identity of the person from the input image. Same scene, same outfit, same lighting, same environment. Only the pose changes: [DESCRIPTION DE LA POSE EN 1-2 PHRASES]. Ultra-realistic, identical setting preserved."
+
+EXEMPLES :
+- "Preserve the identity of the person from the input image. Same scene, same outfit, same lighting, same environment. Only the pose changes: standing with both hands in jacket pockets, facing the camera directly. Ultra-realistic, identical setting preserved."
+
+- "Preserve the identity of the person from the input image. Same scene, same outfit, same lighting, same environment. Only the pose changes: sitting down with legs crossed, leaning back slightly, one arm resting on the armrest. Ultra-realistic, identical setting preserved."
+
+- "Preserve the identity of the person from the input image. Same scene, same outfit, same lighting, same environment. Only the pose changes: holding a snowball with both hands cupped in front of chest, elbows bent. Ultra-realistic, identical setting preserved."
+
+Produis UNIQUEMENT le prompt dans ce format exact, rien d'autre.`
+
+    // ========== APPEL 1 : Première image ==========
+
+    console.log('Describing first image (full prompt)...')
 
     const firstResponse = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: [{
         parts: [
-          { text: firstImagePrompt },
-          firstImagePart
+          { text: firstImageSystemPrompt },
+          { inlineData: { mimeType: 'image/jpeg', data: imageBuffers[0].toString('base64') } }
         ]
       }],
       config: {
@@ -307,78 +290,29 @@ Produis UNIQUEMENT le prompt, sans commentaire ni explication.`
 
     const firstPrompt = (firstResponse.text || '').trim()
     prompts.push(firstPrompt)
-    console.log('First prompt generated:', firstPrompt.substring(0, 100) + '...')
+    console.log('First prompt generated, length:', firstPrompt.length)
 
-    // Si une seule image, on a fini
-    if (imageBuffers.length === 1) {
-      return prompts
-    }
+    // ========== APPELS 2+ : Images suivantes (une par une) ==========
 
-    // ========== APPEL 2 : Images suivantes (uniquement les poses) ==========
+    for (let i = 1; i < imageBuffers.length; i++) {
+      console.log(`Describing image ${i + 1} (pose only)...`)
 
-    const remainingImagesPrompt = `Analyse ces images qui font partie d'un carrousel (même scène, poses différentes).
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: [{
+          parts: [
+            { text: followingImageSystemPrompt },
+            { inlineData: { mimeType: 'image/jpeg', data: imageBuffers[i].toString('base64') } }
+          ]
+        }],
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+        }
+      })
 
-Pour CHAQUE image, génère un prompt TRÈS COURT qui décrit UNIQUEMENT le changement de pose par rapport à la première image.
-
-FORMAT EXACT à utiliser pour chaque prompt :
-"Preserve the identity of the person from the input image. Same scene, same outfit, same lighting. Only change: [POSE EN 1 PHRASE]."
-
-EXEMPLES :
-- "Preserve the identity of the person from the input image. Same scene, same outfit, same lighting. Only change: now facing camera with hands on hips."
-- "Preserve the identity of the person from the input image. Same scene, same outfit, same lighting. Only change: sitting with legs crossed, leaning back."
-- "Preserve the identity of the person from the input image. Same scene, same outfit, same lighting. Only change: standing in profile view, looking left."
-
-RÈGLES :
-- Maximum 2 lignes par prompt
-- Ne décrire QUE la pose
-- Sépare chaque prompt par "---NEXT---"
-- Aucun commentaire, juste les prompts
-
-Je t'envoie ${imageBuffers.length - 1} image(s).`
-
-    const remainingImageParts = imageBuffers.slice(1).map(buffer => ({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: buffer.toString('base64')
-      }
-    }))
-
-    console.log(`Generating prompts for ${remainingImageParts.length} remaining images...`)
-
-    const remainingResponse = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: [{
-        parts: [
-          { text: remainingImagesPrompt },
-          ...remainingImageParts
-        ]
-      }],
-      config: {
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
-      }
-    })
-
-    const remainingText = (remainingResponse.text || '').trim()
-
-    // Parser les prompts séparés par ---NEXT---
-    const remainingPrompts = remainingText
-      .split('---NEXT---')
-      .map(p => p.trim())
-      .filter(p => p.length > 0)
-
-    console.log(`Generated ${remainingPrompts.length} remaining prompts`)
-
-    // Ajouter les prompts restants
-    prompts.push(...remainingPrompts)
-
-    // Vérifier qu'on a le bon nombre
-    if (prompts.length !== imageBuffers.length) {
-      console.warn(`Warning: ${prompts.length} prompts for ${imageBuffers.length} images`)
-      // Compléter avec des duplications du dernier prompt si nécessaire
-      while (prompts.length < imageBuffers.length) {
-        const lastPose = prompts[prompts.length - 1]
-        prompts.push(lastPose)
-      }
+      const prompt = (response.text || '').trim()
+      prompts.push(prompt)
+      console.log(`Prompt ${i + 1}:`, prompt)
     }
 
     return prompts
