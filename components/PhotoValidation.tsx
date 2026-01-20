@@ -76,6 +76,19 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
   const [processingCarouselId, setProcessingCarouselId] = useState<string | null>(null)
 
   /**
+   * Retourne l'URL proxifiée pour les images externes (CORS)
+   * Les URLs locales (/uploads/...) passent directement
+   */
+  const getProxiedUrl = useCallback((url: string) => {
+    // Si c'est une URL locale, pas besoin de proxy
+    if (url.startsWith('/') || url.startsWith('blob:')) {
+      return url
+    }
+    // Pour les URLs externes (Instagram), utiliser le proxy
+    return `/api/proxy-image?url=${encodeURIComponent(url)}`
+  }, [])
+
+  /**
    * Ouvre la modal d'aperçu pour une image
    * Prend en charge la navigation entre toutes les images ou un sous-ensemble (carrousel)
    */
@@ -846,10 +859,10 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
             </button>
           )}
 
-          {/* Image - structure simplifiée */}
+          {/* Image - via proxy pour les URLs externes (CORS) */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={previewModal.imageUrl}
+            src={getProxiedUrl(previewModal.imageUrl)}
             alt="Aperçu"
             className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}
