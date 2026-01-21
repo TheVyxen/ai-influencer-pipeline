@@ -518,17 +518,17 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                     }`}
                   >
                     {/* En-tête du carrousel */}
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                       <div className="flex items-center gap-2">
-                        <Layers className="w-4 h-4 text-blue-500" />
-                        <span className="text-sm font-medium text-blue-700">
+                        <Layers className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                        <span className="text-sm font-medium text-blue-700 whitespace-nowrap">
                           Carrousel ({carouselPhotos.length} photos)
                         </span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-500 truncate">
                           @{carouselPhotos[0]?.source.username}
                         </span>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-shrink-0">
                         <button
                           onClick={() => handleApproveCarousel(carouselPhotos)}
                           disabled={processingCarouselId !== null || processingId !== null || isProcessing}
