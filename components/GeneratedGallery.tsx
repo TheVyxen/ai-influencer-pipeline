@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { Sparkles, Eye, Download, Copy, X, Check, Trash2, FileText, Layers, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Sparkles, Eye, Download, Copy, X, Check, Trash2, FileText, Layers, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
 
@@ -309,7 +309,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                   <button
                     onClick={() => handleDownloadZip()}
                     disabled={isDownloadingZip}
-                    className="px-2.5 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    className="px-2.5 py-1.5 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                   >
                     {isDownloadingZip ? (
                       <>
@@ -336,6 +336,18 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                   </button>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Aide raccourcis */}
+          {photos.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Cliquer sur une image pour l&apos;agrandir
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                Raccourcis : ← → naviguer | Échap fermer
+              </p>
             </div>
           )}
         </div>
@@ -398,13 +410,18 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                   {/* Images du carrousel en scroll horizontal */}
                   <div className="flex gap-3 overflow-x-auto pb-2">
                     {carouselPhotos.map((photo) => (
-                      <div key={photo.id} className="relative flex-shrink-0">
+                      <div key={photo.id} className="relative flex-shrink-0 w-32">
                         <div
-                          className="relative w-36 h-48 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all"
+                          className="relative w-32 h-40 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer group"
                           onClick={() => openImagePreview(photo, carouselPhotos)}
                         >
+                          {/* Overlay hover pour zoom */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-all z-10">
+                            <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+
                           {/* Badge position dans le carrousel */}
-                          <span className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full z-10 font-medium">
+                          <span className="absolute top-1.5 left-1.5 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full z-10 font-medium">
                             {(photo.carouselIndex || 0) + 1}/{photo.carouselTotal}
                           </span>
 
@@ -414,10 +431,10 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                               e.stopPropagation()
                               toggleSelection(photo.id)
                             }}
-                            className={`absolute top-2 right-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all z-10 ${
+                            className={`absolute top-1.5 right-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all z-10 ${
                               selectedIds.has(photo.id)
                                 ? 'bg-blue-500 border-blue-500 text-white'
-                                : 'bg-white/80 dark:bg-gray-800/80 border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                                : 'bg-white/80 border-gray-300 hover:border-blue-400'
                             }`}
                           >
                             {selectedIds.has(photo.id) && (
@@ -437,15 +454,14 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                         <div className="flex gap-1 mt-2">
                           <button
                             onClick={() => setSelectedPrompt({ id: photo.id, prompt: photo.prompt })}
-                            className="flex-1 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
+                            className="flex-1 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
                             title="Voir le prompt"
                           >
                             <FileText className="w-3 h-3" />
-                            Prompt
                           </button>
                           <button
                             onClick={() => handleDownload(photo)}
-                            className="py-1 px-2 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors"
+                            className="flex-1 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors flex items-center justify-center"
                             title="Telecharger"
                           >
                             <Download className="w-3 h-3" />
@@ -552,76 +568,88 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
       {/* Modal pour afficher l'image en grand */}
       {selectedImage && (
         <div
-          className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
           onClick={() => setSelectedImage(null)}
         >
-          <div className="relative max-w-5xl max-h-[90vh] w-full" onClick={e => e.stopPropagation()}>
-            {/* Bouton fermer */}
+          {/* Bouton fermer */}
+          <button
+            onClick={() => setSelectedImage(null)}
+            className="absolute top-4 right-4 z-[101] bg-white/20 hover:bg-white/40 rounded-full p-2 transition"
+          >
+            <X className="w-6 h-6 text-white" />
+          </button>
+
+          {/* Navigation précédent */}
+          {selectedImage.allImages.length > 1 && (
             <button
-              onClick={() => setSelectedImage(null)}
-              className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors"
+              onClick={(e) => {
+                e.stopPropagation()
+                navigatePreview('prev')
+              }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 z-[101] bg-white/20 hover:bg-white/40 rounded-full p-2 transition"
             >
-              <X className="w-8 h-8" />
+              <ChevronLeft className="w-8 h-8 text-white" />
             </button>
+          )}
 
-            {/* Compteur de position (si carrousel) */}
-            {selectedImage.allImages.length > 1 && (
-              <div className="absolute -top-12 left-0 px-3 py-1 bg-white/10 text-white text-sm rounded-full">
-                {selectedImage.currentIndex + 1} / {selectedImage.allImages.length}
-              </div>
-            )}
+          {/* Image */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={selectedImage.url}
+            alt="Photo generee"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
 
-            {/* Flèche gauche */}
-            {selectedImage.allImages.length > 1 && (
-              <button
-                onClick={() => navigatePreview('prev')}
-                className="absolute left-2 top-1/2 -translate-y-1/2 p-3 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-10"
-              >
-                <ChevronLeft className="w-8 h-8" />
-              </button>
-            )}
+          {/* Navigation suivant */}
+          {selectedImage.allImages.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                navigatePreview('next')
+              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 z-[101] bg-white/20 hover:bg-white/40 rounded-full p-2 transition"
+            >
+              <ChevronRight className="w-8 h-8 text-white" />
+            </button>
+          )}
 
-            {/* Image */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={selectedImage.url}
-              alt="Photo generee"
-              className="max-w-full max-h-[80vh] object-contain rounded-lg mx-auto"
-            />
-
-            {/* Flèche droite */}
-            {selectedImage.allImages.length > 1 && (
-              <button
-                onClick={() => navigatePreview('next')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-3 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-10"
-              >
-                <ChevronRight className="w-8 h-8" />
-              </button>
-            )}
-
-            {/* Actions en bas */}
-            <div className="mt-4 flex items-center justify-center gap-3">
-              <button
-                onClick={() => {
-                  setSelectedImage(null)
-                  setSelectedPrompt({ id: selectedImage.id, prompt: selectedImage.prompt })
-                }}
-                className="px-4 py-2 bg-white/10 text-white text-sm font-medium rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
-              >
-                <FileText className="w-4 h-4" />
-                Voir le prompt
-              </button>
-              <button
-                onClick={() => {
-                  const photo = photos.find(p => p.id === selectedImage.id)
-                  if (photo) handleDownload(photo)
-                }}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Telecharger
-              </button>
+          {/* Indicateur de position */}
+          {selectedImage.allImages.length > 1 && (
+            <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1.5 rounded-full">
+              {selectedImage.currentIndex + 1} / {selectedImage.allImages.length}
             </div>
+          )}
+
+          {/* Actions en bas */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setSelectedImage(null)
+                setSelectedPrompt({ id: selectedImage.id, prompt: selectedImage.prompt })
+              }}
+              className="px-4 py-2 bg-white/10 text-white text-sm font-medium rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Voir le prompt
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                const photo = photos.find(p => p.id === selectedImage.id)
+                if (photo) handleDownload(photo)
+              }}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Telecharger
+            </button>
+          </div>
+
+          {/* Aide clavier */}
+          <div className="absolute bottom-4 right-4 text-white/50 text-xs">
+            Échap pour fermer • ← → pour naviguer
           </div>
         </div>
       )}
