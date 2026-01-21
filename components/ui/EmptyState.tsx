@@ -10,11 +10,11 @@ export function EmptyState({ message, icon }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
       {icon && (
-        <div className="text-gray-300 mb-4">
+        <div className="text-gray-300 dark:text-gray-600 mb-4">
           {icon}
         </div>
       )}
-      <p className="text-gray-500 text-sm">{message}</p>
+      <p className="text-gray-500 dark:text-gray-400 text-sm">{message}</p>
     </div>
   )
 }

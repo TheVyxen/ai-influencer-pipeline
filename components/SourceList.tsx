@@ -196,12 +196,12 @@ export function SourceList({ initialSources }: SourceListProps) {
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 h-fit">
-        <div className="p-4 border-b border-gray-100">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 h-fit">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-gray-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Sources Instagram</h2>
+              <Users className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Sources Instagram</h2>
             </div>
             {sources.length > 0 && (
               <button
@@ -228,11 +228,11 @@ export function SourceList({ initialSources }: SourceListProps) {
               {sources.map((source) => (
                 <li
                   key={source.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg group hover:bg-gray-100 transition-colors"
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg group hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
                   <div>
-                    <span className="font-medium text-gray-900">@{source.username}</span>
-                    <span className="text-xs text-gray-500 ml-2">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">@{source.username}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                       ({source._count.photos} photos)
                     </span>
                   </div>
@@ -243,8 +243,8 @@ export function SourceList({ initialSources }: SourceListProps) {
                       disabled={isScraping}
                       className={`p-1.5 rounded transition-colors ${
                         scrapingSourceId === source.id
-                          ? 'text-purple-600 bg-purple-50'
-                          : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50 opacity-0 group-hover:opacity-100'
+                          ? 'text-purple-600 bg-purple-50 dark:bg-purple-900/30'
+                          : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/30 opacity-0 group-hover:opacity-100'
                       } disabled:cursor-not-allowed`}
                       title="Scraper ce compte"
                     >
@@ -254,7 +254,7 @@ export function SourceList({ initialSources }: SourceListProps) {
                     {/* Bouton supprimer */}
                     <button
                       onClick={() => setDeleteModal({ isOpen: true, source })}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors opacity-0 group-hover:opacity-100"
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors opacity-0 group-hover:opacity-100"
                       title="Supprimer"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -273,7 +273,7 @@ export function SourceList({ initialSources }: SourceListProps) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="@username"
-                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 disabled={isLoading}
               />
               <button

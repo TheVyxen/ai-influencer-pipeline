@@ -24,19 +24,19 @@ export function StatsBar({
       label: 'Sources',
       value: sourcesCount,
       icon: Users,
-      color: 'text-blue-600 bg-blue-50',
+      color: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950',
     },
     {
       label: 'En attente',
       value: pendingCount,
       icon: Clock,
-      color: 'text-yellow-600 bg-yellow-50',
+      color: 'text-yellow-600 bg-yellow-50 dark:text-yellow-400 dark:bg-yellow-950',
     },
     {
       label: 'Générées',
       value: generatedCount,
       icon: Sparkles,
-      color: 'text-purple-600 bg-purple-50',
+      color: 'text-purple-600 bg-purple-50 dark:text-purple-400 dark:bg-purple-950',
     },
   ]
 
@@ -69,15 +69,15 @@ export function StatsBar({
         return (
           <div
             key={stat.label}
-            className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
+            className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow"
           >
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-lg ${stat.color}`}>
                 <Icon className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs text-gray-500 font-medium">{stat.label}</p>
-                <p className="text-xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{stat.label}</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stat.value}</p>
               </div>
             </div>
           </div>
@@ -85,14 +85,14 @@ export function StatsBar({
       })}
 
       {/* Dernière activité */}
-      <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+      <div className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg text-gray-600 bg-gray-100">
+          <div className="p-2 rounded-lg text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800">
             <Activity className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-xs text-gray-500 font-medium">Dernière activité</p>
-            <p className="text-sm font-semibold text-gray-900">{formatLastActivity(lastActivity)}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Dernière activité</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{formatLastActivity(lastActivity)}</p>
           </div>
         </div>
       </div>

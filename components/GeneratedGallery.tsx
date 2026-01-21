@@ -205,21 +205,21 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 h-fit">
-        <div className="p-4 border-b border-gray-100">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 h-fit">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-purple-600" />
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   Photos generees
                   {photos.length > 0 && (
-                    <span className="ml-2 text-sm font-normal text-gray-500">
+                    <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
                       ({photos.length})
                     </span>
                   )}
                 </h2>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Images generees par Gemini
                 </p>
               </div>
@@ -232,7 +232,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
               {/* Bouton Tout selectionner / Deselectionner */}
               <button
                 onClick={toggleSelectAll}
-                className="px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1"
+                className="px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1"
               >
                 {selectedIds.size === photos.length ? 'Tout deselectionner' : 'Tout selectionner'}
               </button>
@@ -286,15 +286,15 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
               {Array.from(groupedPhotos.carousels.entries()).map(([carouselId, carouselPhotos]) => (
                 <div
                   key={carouselId}
-                  className="border rounded-lg p-4 bg-gradient-to-r from-purple-50 to-pink-50"
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20"
                 >
                   {/* Header du carrousel */}
                   <div className="flex items-center gap-2 mb-3">
                     <Layers className="w-4 h-4 text-purple-500" />
-                    <span className="text-sm font-medium text-purple-700">
+                    <span className="text-sm font-medium text-purple-700 dark:text-purple-400">
                       Carrousel ({carouselPhotos.length} photos)
                     </span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
                       {new Intl.DateTimeFormat('fr-FR', {
                         day: '2-digit',
                         month: '2-digit',
@@ -334,7 +334,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                     {carouselPhotos.map((photo) => (
                       <div key={photo.id} className="relative flex-shrink-0">
                         <div
-                          className="relative w-36 h-48 bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all"
+                          className="relative w-36 h-48 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all"
                           onClick={() => setSelectedImage({
                             id: photo.id,
                             url: photo.localPath || `/api/images/generated/${photo.id}`,
@@ -355,7 +355,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                             className={`absolute top-2 right-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-all z-10 ${
                               selectedIds.has(photo.id)
                                 ? 'bg-blue-500 border-blue-500 text-white'
-                                : 'bg-white/80 border-gray-300 hover:border-blue-400'
+                                : 'bg-white/80 dark:bg-gray-800/80 border-gray-300 dark:border-gray-600 hover:border-blue-400'
                             }`}
                           >
                             {selectedIds.has(photo.id) && (
@@ -375,7 +375,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                         <div className="flex gap-1 mt-2">
                           <button
                             onClick={() => setSelectedPrompt({ id: photo.id, prompt: photo.prompt })}
-                            className="flex-1 py-1 bg-gray-100 text-gray-600 rounded text-xs hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"
+                            className="flex-1 py-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
                             title="Voir le prompt"
                           >
                             <FileText className="w-3 h-3" />
@@ -401,13 +401,13 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                   {groupedPhotos.singles.map((photo) => (
                     <div
                       key={photo.id}
-                      className={`bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-all ${
+                      className={`bg-white dark:bg-gray-900 rounded-lg shadow-sm border overflow-hidden hover:shadow-md dark:hover:shadow-gray-900 transition-all ${
                         selectedIds.has(photo.id)
-                          ? 'border-blue-500 ring-2 ring-blue-200'
-                          : 'border-gray-100'
+                          ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
+                          : 'border-gray-100 dark:border-gray-800'
                       }`}
                     >
-                      <div className="aspect-square relative bg-gray-100">
+                      <div className="aspect-square relative bg-gray-100 dark:bg-gray-800">
                         {/* Checkbox de selection */}
                         <div className="absolute top-2 left-2 z-10">
                           <button
@@ -415,7 +415,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                             className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
                               selectedIds.has(photo.id)
                                 ? 'bg-blue-500 border-blue-500 text-white'
-                                : 'bg-white/80 border-gray-300 hover:border-blue-400'
+                                : 'bg-white/80 dark:bg-gray-800/80 border-gray-300 dark:border-gray-600 hover:border-blue-400'
                             }`}
                           >
                             {selectedIds.has(photo.id) && (
@@ -426,7 +426,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
 
                         {/* Badge genere */}
                         <div className="absolute top-2 right-2 z-10">
-                          <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
+                          <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-400 rounded-full">
                             Generee
                           </span>
                         </div>
@@ -439,7 +439,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                         />
                       </div>
                       <div className="p-3">
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
                           {new Intl.DateTimeFormat('fr-FR', {
                             day: '2-digit',
                             month: '2-digit',
@@ -458,14 +458,14 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                                 url: photo.localPath || `/api/images/generated/${photo.id}`,
                                 prompt: photo.prompt
                               })}
-                              className="flex-1 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-1"
+                              className="flex-1 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
                             >
                               <Eye className="w-4 h-4" />
                               Voir
                             </button>
                             <button
                               onClick={() => setSelectedPrompt({ id: photo.id, prompt: photo.prompt })}
-                              className="py-1.5 px-2.5 bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-200 hover:text-gray-700 transition-colors"
+                              className="py-1.5 px-2.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
                               title="Voir le prompt"
                             >
                               <FileText className="w-4 h-4" />
@@ -544,25 +544,25 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
       {/* Modal pour afficher le prompt */}
       {selectedPrompt && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Prompt utilise</h3>
+          <div className="bg-white dark:bg-gray-900 rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+            <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Prompt utilise</h3>
               <button
                 onClick={() => setSelectedPrompt(null)}
-                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
             <div className="p-4 overflow-y-auto max-h-[60vh]">
-              <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
                 {selectedPrompt.prompt}
               </p>
             </div>
-            <div className="p-4 border-t border-gray-100 flex justify-end gap-2">
+            <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-2">
               <button
                 onClick={() => handleCopyPrompt(selectedPrompt.prompt)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1"
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1"
               >
                 <Copy className="w-4 h-4" />
                 Copier

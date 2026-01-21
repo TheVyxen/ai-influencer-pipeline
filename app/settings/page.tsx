@@ -19,9 +19,13 @@ import {
   Key,
   Zap,
   ImageIcon,
-  Sparkles
+  Sparkles,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { useTheme } from '@/components/ThemeProvider'
 
 interface ReferencePhoto {
   exists: boolean
@@ -44,6 +48,9 @@ interface ApiStatus {
  * - Options de génération d'image
  */
 export default function SettingsPage() {
+  // Hook pour le thème
+  const { theme, setTheme } = useTheme()
+
   // États pour les settings
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [referencePhoto, setReferencePhoto] = useState<ReferencePhoto | null>(null)
@@ -222,7 +229,7 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-gray-50 p-8">
+      <main className="min-h-screen bg-gray-50 dark:bg-gray-950 p-8">
         <div className="max-w-2xl mx-auto flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
         </div>
@@ -231,18 +238,18 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Settings className="w-6 h-6 text-gray-600" />
-              <h1 className="text-xl font-bold text-gray-900">Settings</h1>
+              <Settings className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
             </div>
             <Link
               href="/"
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               Retour au dashboard
@@ -252,22 +259,81 @@ export default function SettingsPage() {
       </header>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Section Photo de référence */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        {/* Section Apparence / Thème */}
+        <section className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
           <div className="flex items-center gap-2 mb-4">
-            <User className="w-5 h-5 text-gray-600" />
-            <h2 className="text-lg font-semibold text-gray-900">
+            <Sun className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Apparence
+            </h2>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Choisissez le thème de l&apos;interface.
+          </p>
+
+          <div className="grid grid-cols-3 gap-3">
+            {/* Light */}
+            <button
+              onClick={() => setTheme('light')}
+              className={`p-4 rounded-lg border-2 transition-all text-center ${
+                theme === 'light'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <Sun className={`w-6 h-6 mx-auto mb-2 ${theme === 'light' ? 'text-blue-600' : 'text-gray-400'}`} />
+              <span className={`text-sm font-medium ${theme === 'light' ? 'text-blue-900 dark:text-blue-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                Clair
+              </span>
+            </button>
+
+            {/* Dark */}
+            <button
+              onClick={() => setTheme('dark')}
+              className={`p-4 rounded-lg border-2 transition-all text-center ${
+                theme === 'dark'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <Moon className={`w-6 h-6 mx-auto mb-2 ${theme === 'dark' ? 'text-blue-600' : 'text-gray-400'}`} />
+              <span className={`text-sm font-medium ${theme === 'dark' ? 'text-blue-900 dark:text-blue-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                Sombre
+              </span>
+            </button>
+
+            {/* System */}
+            <button
+              onClick={() => setTheme('system')}
+              className={`p-4 rounded-lg border-2 transition-all text-center ${
+                theme === 'system'
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <Monitor className={`w-6 h-6 mx-auto mb-2 ${theme === 'system' ? 'text-blue-600' : 'text-gray-400'}`} />
+              <span className={`text-sm font-medium ${theme === 'system' ? 'text-blue-900 dark:text-blue-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                Système
+              </span>
+            </button>
+          </div>
+        </section>
+        {/* Section Photo de référence */}
+        <section className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <User className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Photo de référence du modèle
             </h2>
           </div>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Cette photo sera utilisée comme base pour toutes les générations d&apos;images.
             Elle définit l&apos;identité visuelle de votre modèle IA.
           </p>
 
           <div className="flex items-start gap-6">
             {/* Aperçu de la photo */}
-            <div className="w-40 h-40 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 relative">
+            <div className="w-40 h-40 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden flex-shrink-0 relative">
               {referencePhoto?.exists && referencePhoto.path ? (
                 <Image
                   src={`${referencePhoto.path}?t=${Date.now()}`}
@@ -321,7 +387,7 @@ export default function SettingsPage() {
                 </button>
               )}
 
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 dark:text-gray-500">
                 Formats acceptés : JPG, PNG. Résolution recommandée : 1024x1024 minimum.
               </p>
             </div>
@@ -329,14 +395,14 @@ export default function SettingsPage() {
         </section>
 
         {/* Section Clés API */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <section className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
           <div className="flex items-center gap-2 mb-4">
-            <Key className="w-5 h-5 text-gray-600" />
-            <h2 className="text-lg font-semibold text-gray-900">
+            <Key className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Clés API
             </h2>
           </div>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
             Configurez vos clés API pour activer les différentes fonctionnalités.
             Utilisez le bouton &quot;Tester&quot; pour vérifier chaque connexion.
           </p>
@@ -345,12 +411,12 @@ export default function SettingsPage() {
             {/* Google AI API Key */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Google AI API Key
                 </label>
                 <ApiStatusIndicator status={apiStatus.google_ai} />
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Pour la description (Gemini 3 Pro) et la génération d&apos;images (Gemini 3 Pro Image)
               </p>
               <div className="flex gap-2">
@@ -360,7 +426,7 @@ export default function SettingsPage() {
                     value={settings.google_ai_api_key || ''}
                     onChange={(e) => updateSetting('google_ai_api_key', e.target.value)}
                     placeholder="AIza..."
-                    className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <button
                     type="button"
@@ -373,7 +439,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => testApi('google_ai')}
                   disabled={!settings.google_ai_api_key || apiStatus.google_ai === 'testing'}
-                  className="px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                  className="px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                 >
                   {apiStatus.google_ai === 'testing' ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -388,7 +454,7 @@ export default function SettingsPage() {
             {/* Wavespeed API Key */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Wavespeed API Key
                   {currentProvider === 'wavespeed' && (
                     <span className="ml-2 px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
@@ -398,7 +464,7 @@ export default function SettingsPage() {
                 </label>
                 <ApiStatusIndicator status={apiStatus.wavespeed} />
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Alternative à Gemini pour la génération d&apos;images (google/nano-banana-pro/edit)
               </p>
               <div className="flex gap-2">
@@ -408,7 +474,7 @@ export default function SettingsPage() {
                     value={settings.wavespeed_api_key || ''}
                     onChange={(e) => updateSetting('wavespeed_api_key', e.target.value)}
                     placeholder="wsk_..."
-                    className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <button
                     type="button"
@@ -421,7 +487,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => testApi('wavespeed')}
                   disabled={!settings.wavespeed_api_key || apiStatus.wavespeed === 'testing'}
-                  className="px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                  className="px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                 >
                   {apiStatus.wavespeed === 'testing' ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -436,12 +502,12 @@ export default function SettingsPage() {
             {/* Apify API Key */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Apify API Key
                 </label>
                 <ApiStatusIndicator status={apiStatus.apify} />
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Pour le scraping Instagram
               </p>
               <div className="flex gap-2">
@@ -451,7 +517,7 @@ export default function SettingsPage() {
                     value={settings.apify_api_key || ''}
                     onChange={(e) => updateSetting('apify_api_key', e.target.value)}
                     placeholder="apify_api_..."
-                    className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <button
                     type="button"
@@ -464,7 +530,7 @@ export default function SettingsPage() {
                 <button
                   onClick={() => testApi('apify')}
                   disabled={!settings.apify_api_key || apiStatus.apify === 'testing'}
-                  className="px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                  className="px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                 >
                   {apiStatus.apify === 'testing' ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -478,10 +544,10 @@ export default function SettingsPage() {
           </div>
 
           {/* Séparateur */}
-          <div className="border-t border-gray-200 my-6"></div>
+          <div className="border-t border-gray-200 dark:border-gray-700 my-6"></div>
 
           {/* Section Configuration du scraping */}
-          <h3 className="text-md font-medium text-gray-900 mb-4">Configuration du scraping</h3>
+          <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">Configuration du scraping</h3>
           <div className="space-y-4">
             {/* Posts par scrape */}
             <div>
@@ -497,18 +563,18 @@ export default function SettingsPage() {
                 max="50"
                 value={settings.posts_per_scrape || '10'}
                 onChange={(e) => updateSetting('posts_per_scrape', e.target.value)}
-                className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-32 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
 
           {/* Séparateur */}
-          <div className="border-t border-gray-200 my-6"></div>
+          <div className="border-t border-gray-200 dark:border-gray-700 my-6"></div>
 
           {/* Section Configuration de génération d'images */}
           <div className="flex items-center gap-2 mb-4">
             <ImageIcon className="w-5 h-5 text-gray-600" />
-            <h3 className="text-md font-medium text-gray-900">Configuration de génération</h3>
+            <h3 className="text-md font-medium text-gray-900 dark:text-gray-100">Configuration de génération</h3>
           </div>
 
           {/* Provider de génération */}
@@ -538,7 +604,7 @@ export default function SettingsPage() {
                     <CheckCircle className="w-4 h-4 text-blue-600 ml-auto" />
                   )}
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Recommandé - Retry auto (3x)
                 </p>
               </button>
@@ -561,7 +627,7 @@ export default function SettingsPage() {
                     <CheckCircle className="w-4 h-4 text-purple-600 ml-auto" />
                   )}
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Alternative - Nano Banana Pro
                 </p>
               </button>
@@ -570,7 +636,7 @@ export default function SettingsPage() {
 
           {/* Options Gemini uniquement */}
           {currentProvider === 'gemini' && (
-            <div className="grid grid-cols-2 gap-6 p-4 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-2 gap-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
               {/* Format d'image */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -582,7 +648,7 @@ export default function SettingsPage() {
                 <select
                   value={settings.image_aspect_ratio || '9:16'}
                   onChange={(e) => updateSetting('image_aspect_ratio', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 >
                   <option value="9:16">9:16 (Portrait - Instagram Stories)</option>
                   <option value="1:1">1:1 (Carré - Instagram Feed)</option>
@@ -601,7 +667,7 @@ export default function SettingsPage() {
                 <select
                   value={settings.image_size || '2K'}
                   onChange={(e) => updateSetting('image_size', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 >
                   <option value="1K">1K (Rapide)</option>
                   <option value="2K">2K (Recommandé)</option>
@@ -614,21 +680,21 @@ export default function SettingsPage() {
           {/* Info Wavespeed */}
           {currentProvider === 'wavespeed' && (
             <div className="space-y-3">
-              <div className="p-4 bg-purple-50 rounded-lg">
-                <p className="text-sm text-purple-700">
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <p className="text-sm text-purple-700 dark:text-purple-300">
                   <strong>Modèle utilisé :</strong> google/nano-banana-pro/edit
                 </p>
-                <p className="text-xs text-purple-600 mt-1">
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
                   Les options de format et qualité sont disponibles avec Wavespeed.
                 </p>
               </div>
               {/* Avertissement si l'app n'est pas déployée */}
               {!process.env.NEXT_PUBLIC_APP_URL && (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-700 font-medium">
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
                     Wavespeed n&apos;est pas disponible en local
                   </p>
-                  <p className="text-xs text-amber-600 mt-1">
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                     Wavespeed nécessite que l&apos;app soit déployée (NEXT_PUBLIC_APP_URL configuré).
                     En attendant, utilisez Gemini pour la génération d&apos;images.
                   </p>
@@ -637,7 +703,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <div className="mt-6 pt-4 border-t border-gray-100">
+          <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-800">
             <button
               onClick={handleSaveSettings}
               disabled={isSaving}
@@ -659,11 +725,11 @@ export default function SettingsPage() {
         </section>
 
         {/* Note informative */}
-        <section className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-          <h3 className="text-sm font-medium text-yellow-800 mb-2">
+        <section className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4">
+          <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-2">
             Note importante
           </h3>
-          <p className="text-sm text-yellow-700">
+          <p className="text-sm text-yellow-700 dark:text-yellow-300">
             Les clés API stockées dans Settings sont utilisées côté serveur uniquement.
             Pour une sécurité optimale en production, utilisez plutôt des variables
             d&apos;environnement (.env) sur votre serveur.

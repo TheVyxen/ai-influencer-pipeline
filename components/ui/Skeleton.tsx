@@ -13,7 +13,7 @@ export function Skeleton({ className }: SkeletonProps) {
   return (
     <div
       className={cn(
-        'animate-pulse bg-gray-200 rounded',
+        'animate-pulse bg-gray-200 dark:bg-gray-700 rounded',
         className
       )}
     />
@@ -25,7 +25,7 @@ export function Skeleton({ className }: SkeletonProps) {
  */
 export function PhotoCardSkeleton() {
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
       <Skeleton className="aspect-square w-full" />
       <div className="p-3 space-y-2">
         <Skeleton className="h-3 w-20" />
@@ -53,7 +53,7 @@ export function PhotoGridSkeleton({ count = 4 }: { count?: number }) {
  */
 export function SourceItemSkeleton() {
   return (
-    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
       <div className="flex items-center gap-2">
         <Skeleton className="h-5 w-24" />
         <Skeleton className="h-4 w-16" />
@@ -86,7 +86,7 @@ export function StatsBarSkeleton() {
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="bg-white rounded-lg p-4 border border-gray-100">
+        <div key={i} className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-100 dark:border-gray-800">
           <Skeleton className="h-4 w-16 mb-2" />
           <Skeleton className="h-8 w-12" />
         </div>

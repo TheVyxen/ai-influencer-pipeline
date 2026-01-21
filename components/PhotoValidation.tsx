@@ -422,15 +422,15 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-        <div className="p-4 border-b border-gray-100">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-yellow-600" />
-              <h2 className="text-lg font-semibold text-gray-900">
+              <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-500" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 Photos à valider
                 {photos.length > 0 && (
-                  <span className="ml-2 text-sm font-normal text-gray-500">
+                  <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
                     ({photos.length})
                   </span>
                 )}
@@ -439,7 +439,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
             <button
               onClick={() => setShowUploadModal(true)}
               disabled={sources.length === 0}
-              className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
             >
               <Upload className="w-4 h-4" />
               Upload
@@ -451,7 +451,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
             <div className="mt-3 flex items-center gap-2 flex-wrap">
               <button
                 onClick={toggleSelectAll}
-                className="px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1"
+                className="px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1"
               >
                 {selectedIds.size === photos.length ? (
                   <CheckSquare className="w-3.5 h-3.5" />
@@ -487,10 +487,10 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
           {/* Aide raccourcis et workflow */}
           {photos.length > 0 && (
             <div className="mt-2 space-y-1">
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Valider = Décrire + Générer automatiquement
               </p>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-400 dark:text-gray-500">
                 Raccourcis : ← → naviguer | A approuver | R rejeter
               </p>
             </div>
@@ -513,18 +513,18 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                 return (
                   <div
                     key={carouselId}
-                    className={`border-2 border-blue-200 rounded-xl p-4 bg-blue-50/50 ${
+                    className={`border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 bg-blue-50/50 dark:bg-blue-950/30 ${
                       processingCarouselId === carouselId ? 'opacity-75' : ''
                     }`}
                   >
                     {/* En-tête du carrousel */}
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                       <div className="flex items-center gap-2">
-                        <Layers className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                        <span className="text-sm font-medium text-blue-700 whitespace-nowrap">
+                        <Layers className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                        <span className="text-sm font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
                           Carrousel ({carouselPhotos.length} photos)
                         </span>
-                        <span className="text-xs text-gray-500 truncate">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           @{carouselPhotos[0]?.source.username}
                         </span>
                       </div>
@@ -557,7 +557,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                       {carouselPhotos.map((photo) => (
                         <div key={photo.id} className="relative flex-shrink-0 w-32">
                           <div
-                            className="relative w-32 h-40 bg-gray-100 rounded-lg overflow-hidden cursor-pointer group"
+                            className="relative w-32 h-40 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer group"
                             onClick={() => openPreview(photo.localPath || photo.originalUrl, carouselImageUrls)}
                           >
                             {/* Overlay de traitement */}
@@ -642,16 +642,16 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                   {groupedPhotos.singles.map((photo, index) => (
                     <div
                       key={photo.id}
-                      className={`bg-white rounded-lg shadow-sm border overflow-hidden transition-all ${
+                      className={`bg-white dark:bg-gray-900 rounded-lg shadow-sm border overflow-hidden transition-all ${
                         selectedIds.has(photo.id)
-                          ? 'border-blue-500 ring-2 ring-blue-200'
+                          ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
                           : index === currentPhotoIndex
-                          ? 'border-purple-400 ring-1 ring-purple-200'
-                          : 'border-gray-100 hover:shadow-md'
+                          ? 'border-purple-400 ring-1 ring-purple-200 dark:ring-purple-800'
+                          : 'border-gray-100 dark:border-gray-800 hover:shadow-md'
                       }`}
                     >
                       <div
-                        className="aspect-square relative bg-gray-100 cursor-pointer group"
+                        className="aspect-square relative bg-gray-100 dark:bg-gray-800 cursor-pointer group"
                         onClick={() => {
                           setCurrentPhotoIndex(index)
                           openPreview(photo.localPath || photo.originalUrl)
@@ -706,7 +706,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                         />
                       </div>
                       <div className="p-3">
-                        <p className="text-xs text-gray-500 truncate">@{photo.source.username}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{photo.source.username}</p>
                         <div className="mt-2 flex gap-2">
                           <button
                             onClick={(e) => {
@@ -750,23 +750,23 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
       {/* Modal d'upload */}
       {showUploadModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4">Upload manuel</h3>
+          <div className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Upload manuel</h3>
 
             {sources.length === 0 ? (
-              <p className="text-gray-500 text-sm mb-4">
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
                 Ajoutez d&apos;abord une source Instagram
               </p>
             ) : (
               <>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Source
                   </label>
                   <select
                     value={selectedSourceId}
                     onChange={(e) => setSelectedSourceId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {sources.map((source) => (
                       <option key={source.id} value={source.id}>
@@ -777,7 +777,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Image
                   </label>
                   <input
@@ -786,7 +786,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                     accept="image/*"
                     onChange={handleUpload}
                     disabled={isUploading}
-                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    className="w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 dark:file:bg-blue-900/50 file:text-blue-700 dark:file:text-blue-300 hover:file:bg-blue-100 dark:hover:file:bg-blue-900"
                   />
                 </div>
               </>
@@ -795,14 +795,14 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowUploadModal(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
               >
                 Annuler
               </button>
             </div>
 
             {isUploading && (
-              <div className="mt-4 text-center text-sm text-gray-500">
+              <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
                 Upload en cours...
               </div>
             )}
