@@ -73,8 +73,8 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
     currentIndex: 0,
   })
 
-  // État pour suivre le carrousel en cours de traitement
-  const [processingCarouselId, setProcessingCarouselId] = useState<string | null>(null)
+  // État pour suivre les carrousels en cours de traitement (permet le traitement parallèle)
+  const [processingCarouselIds, setProcessingCarouselIds] = useState<Set<string>>(new Set())
 
   /**
    * Retourne l'URL proxifiée pour les images externes (CORS)
@@ -299,11 +299,15 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
   }
 
   // Approuver tout le carrousel (appel unique à l'endpoint carrousel)
+  // Permet le traitement parallèle de plusieurs carrousels
   const handleApproveCarousel = async (carouselPhotos: PendingPhoto[]) => {
     if (carouselPhotos.length === 0) return
 
     const carouselId = carouselPhotos[0].carouselId
-    setProcessingCarouselId(carouselId)
+    if (!carouselId) return
+
+    // Ajouter ce carrousel aux carrousels en cours de traitement
+    setProcessingCarouselIds(prev => new Set(prev).add(carouselId))
 
     const total = carouselPhotos.length
     const toastId = toast.loading(`Traitement du carrousel (${total} photos)...`, { duration: Infinity })
@@ -338,7 +342,12 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
       toast.error(errorMsg, { id: toastId })
       console.error('Error in carousel approve workflow:', err)
     } finally {
-      setProcessingCarouselId(null)
+      // Retirer ce carrousel des carrousels en cours de traitement
+      setProcessingCarouselIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(carouselId)
+        return newSet
+      })
     }
   }
 
@@ -515,7 +524,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                   <div
                     key={carouselId}
                     className={`border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 bg-blue-50/50 dark:bg-blue-950/30 ${
-                      processingCarouselId === carouselId ? 'opacity-75' : ''
+                      processingCarouselIds.has(carouselId) ? 'opacity-75' : ''
                     }`}
                   >
                     {/* En-tête du carrousel */}
@@ -545,10 +554,10 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                       <div className="flex gap-2 flex-shrink-0">
                         <button
                           onClick={() => handleApproveCarousel(carouselPhotos)}
-                          disabled={processingCarouselId !== null || processingId !== null || isProcessing}
+                          disabled={processingCarouselIds.has(carouselId) || isProcessing}
                           className="px-3 py-1.5 text-xs font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                         >
-                          {processingCarouselId === carouselId ? (
+                          {processingCarouselIds.has(carouselId) ? (
                             <Loader2 className="w-3 h-3 animate-spin" />
                           ) : (
                             <Check className="w-3 h-3" />
@@ -557,7 +566,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                         </button>
                         <button
                           onClick={() => handleRejectCarousel(carouselPhotos)}
-                          disabled={processingCarouselId !== null || processingId !== null || isProcessing}
+                          disabled={processingCarouselIds.has(carouselId) || isProcessing}
                           className="px-3 py-1.5 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                         >
                           <X className="w-3 h-3" />
@@ -597,7 +606,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                                 e.stopPropagation()
                                 toggleSelection(photo.id)
                               }}
-                              disabled={processingId !== null || processingCarouselId !== null}
+                              disabled={processingId !== null || processingCarouselIds.has(carouselId)}
                               className={`absolute top-1.5 right-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all z-10 ${
                                 selectedIds.has(photo.id)
                                   ? 'bg-blue-500 border-blue-500 text-white'
@@ -622,7 +631,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                           <div className="flex gap-1 mt-1.5">
                             <button
                               onClick={() => handleApprove(photo.id)}
-                              disabled={processingId !== null || processingCarouselId !== null || isProcessing}
+                              disabled={processingId === photo.id || processingCarouselIds.has(carouselId) || isProcessing}
                               className={`flex-1 py-1.5 text-white rounded-lg transition-colors flex items-center justify-center ${
                                 processingId === photo.id
                                   ? 'bg-green-400 cursor-wait'
@@ -637,7 +646,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                             </button>
                             <button
                               onClick={() => setRejectModal({ isOpen: true, photoIds: [photo.id] })}
-                              disabled={processingId !== null || processingCarouselId !== null || isProcessing}
+                              disabled={processingId === photo.id || processingCarouselIds.has(carouselId) || isProcessing}
                               className="flex-1 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
                             >
                               <X className="w-3 h-3" />
