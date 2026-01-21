@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 
+// Force dynamic pour éviter le pré-rendu (données trop volumineuses)
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/photos/generated
  * Liste toutes les photos générées
