@@ -297,7 +297,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
     setRejectModal({ isOpen: true, photoIds: Array.from(selectedIds) })
   }
 
-  // Approuver tout le carrousel (workflow complet pour chaque photo)
+  // Approuver tout le carrousel (appel unique à l'endpoint carrousel)
   const handleApproveCarousel = async (carouselPhotos: PendingPhoto[]) => {
     if (carouselPhotos.length === 0) return
 
@@ -305,49 +305,39 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
     setProcessingCarouselId(carouselId)
 
     const total = carouselPhotos.length
-    const toastId = toast.loading(`Traitement du carrousel (0/${total})...`, { duration: Infinity })
+    const toastId = toast.loading(`Traitement du carrousel (${total} photos)...`, { duration: Infinity })
 
-    let successCount = 0
-    let errorCount = 0
+    try {
+      // Appel unique à l'endpoint carrousel avec tous les IDs
+      const res = await fetch('/api/photos/approve-carousel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoIds: carouselPhotos.map(p => p.id) })
+      })
 
-    for (let i = 0; i < carouselPhotos.length; i++) {
-      const photo = carouselPhotos[i]
-      toast.loading(`Traitement du carrousel (${i + 1}/${total})...`, { id: toastId })
+      const data = await res.json()
 
-      try {
-        const res = await fetch(`/api/photos/${photo.id}/approve`, {
-          method: 'PATCH'
-        })
-
-        const data = await res.json()
-
-        if (!res.ok) {
-          throw new Error(data.error || 'Échec du traitement')
-        }
-
-        setPhotos(prev => prev.filter(p => p.id !== photo.id))
-        setSelectedIds(prev => {
-          const newSet = new Set(prev)
-          newSet.delete(photo.id)
-          return newSet
-        })
-        successCount++
-      } catch (err) {
-        errorCount++
-        console.error('Error in carousel approve workflow:', err)
+      if (!res.ok) {
+        throw new Error(data.error || 'Échec du traitement')
       }
-    }
 
-    setProcessingCarouselId(null)
+      // Retirer toutes les photos du carrousel de l'état local
+      const photoIds = carouselPhotos.map(p => p.id)
+      setPhotos(prev => prev.filter(p => !photoIds.includes(p.id)))
+      setSelectedIds(prev => {
+        const newSet = new Set(prev)
+        photoIds.forEach(id => newSet.delete(id))
+        return newSet
+      })
 
-    if (successCount > 0 && errorCount === 0) {
-      toast.success(`Carrousel validé et généré (${successCount} photos) !`, { id: toastId })
+      toast.success(`Carrousel validé et généré (${total} photos) !`, { id: toastId })
       router.refresh()
-    } else if (successCount > 0) {
-      toast.success(`${successCount} photo(s) traitée(s), ${errorCount} erreur(s)`, { id: toastId })
-      router.refresh()
-    } else {
-      toast.error(`Échec du traitement du carrousel`, { id: toastId })
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Erreur lors du traitement'
+      toast.error(errorMsg, { id: toastId })
+      console.error('Error in carousel approve workflow:', err)
+    } finally {
+      setProcessingCarouselId(null)
     }
   }
 
