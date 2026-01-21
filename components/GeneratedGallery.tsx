@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { Sparkles, Eye, Download, Copy, X, Check, Trash2, FileText, Layers, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react'
+import { Sparkles, Eye, Download, Copy, X, Check, Trash2, FileText, Layers, ChevronLeft, ChevronRight, ZoomIn, CheckSquare, Square } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
 
@@ -277,7 +277,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-purple-600" />
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                Photos generees
+                Photos générées
                 {photos.length > 0 && (
                   <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
                     ({photos.length})
@@ -285,6 +285,8 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                 )}
               </h2>
             </div>
+            {/* Spacer pour aligner avec le bouton Upload de PhotoValidation */}
+            <div className="px-3 py-1.5 text-sm invisible">Upload</div>
           </div>
 
           {/* Boutons de selection et telechargement */}
@@ -295,7 +297,12 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                 onClick={toggleSelectAll}
                 className="px-2.5 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center gap-1"
               >
-                {selectedIds.size === photos.length ? 'Tout deselectionner' : 'Tout selectionner'}
+                {selectedIds.size === photos.length ? (
+                  <CheckSquare className="w-3.5 h-3.5" />
+                ) : (
+                  <Square className="w-3.5 h-3.5" />
+                )}
+                {selectedIds.size === photos.length ? 'Désélectionner' : 'Tout sélectionner'}
               </button>
 
               {/* Actions sur la selection */}
@@ -359,7 +366,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
               {Array.from(groupedPhotos.carousels.entries()).map(([carouselId, carouselPhotos]) => (
                 <div
                   key={carouselId}
-                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20"
+                  className="border-2 border-purple-200 dark:border-purple-800 rounded-xl p-4 bg-purple-50/50 dark:bg-purple-950/30"
                 >
                   {/* Header du carrousel */}
                   <div className="flex items-center gap-2 mb-3">
@@ -367,35 +374,25 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                     <span className="text-sm font-medium text-purple-700 dark:text-purple-400">
                       Carrousel ({carouselPhotos.length} photos)
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {new Intl.DateTimeFormat('fr-FR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }).format(new Date(carouselPhotos[0].createdAt))}
-                    </span>
                     <div className="ml-auto flex gap-2">
                       <button
                         onClick={() => handleDownloadZip(carouselPhotos.map(p => p.id))}
                         disabled={downloadingCarouselId === carouselId}
-                        className="px-3 py-1 text-xs font-medium text-white bg-purple-500 rounded hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                        className="px-3 py-1.5 text-xs font-medium text-white bg-purple-500 rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
                       >
                         {downloadingCarouselId === carouselId ? (
-                          <>
-                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                          </>
+                          <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
                         ) : (
                           <Download className="w-3 h-3" />
                         )}
-                        Telecharger tout
+                        Télécharger
                       </button>
                       <button
                         onClick={() => setDeleteModal({ isOpen: true, photoIds: carouselPhotos.map(p => p.id) })}
-                        className="px-3 py-1 text-xs font-medium text-white bg-red-500 rounded hover:bg-red-600 transition-colors flex items-center gap-1"
+                        className="px-2 py-1.5 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-1"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
