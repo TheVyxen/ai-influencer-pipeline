@@ -276,19 +276,14 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-purple-600" />
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Photos generees
-                  {photos.length > 0 && (
-                    <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-                      ({photos.length})
-                    </span>
-                  )}
-                </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Images generees par Gemini
-                </p>
-              </div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Photos generees
+                {photos.length > 0 && (
+                  <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
+                    ({photos.length})
+                  </span>
+                )}
+              </h2>
             </div>
           </div>
 
