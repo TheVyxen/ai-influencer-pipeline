@@ -67,6 +67,7 @@ export default async function Home() {
     localPath: p.localPath,
     status: p.status,
     createdAt: p.createdAt.toISOString(),
+    instagramPostUrl: p.instagramPostUrl,
     // Champs carrousel
     isCarousel: p.isCarousel,
     carouselId: p.carouselId,

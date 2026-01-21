@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import toast from 'react-hot-toast'
-import { Clock, Upload, Check, X, CheckSquare, Square, XSquare, Loader2, Layers, ChevronLeft, ChevronRight, ZoomIn } from 'lucide-react'
+import { Clock, Upload, Check, X, CheckSquare, Square, XSquare, Loader2, Layers, ChevronLeft, ChevronRight, ZoomIn, ExternalLink } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
 
@@ -14,6 +14,7 @@ interface PendingPhoto {
   localPath: string | null
   status: string
   createdAt: string
+  instagramPostUrl: string | null
   // Champs carrousel
   isCarousel: boolean
   carouselId: string | null
@@ -524,9 +525,22 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                         <span className="text-sm font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">
                           Carrousel ({carouselPhotos.length} photos)
                         </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          @{carouselPhotos[0]?.source.username}
-                        </span>
+                        {carouselPhotos[0]?.instagramPostUrl ? (
+                          <a
+                            href={carouselPhotos[0].instagramPostUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            @{carouselPhotos[0]?.source.username}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            @{carouselPhotos[0]?.source.username}
+                          </span>
+                        )}
                       </div>
                       <div className="flex gap-2 flex-shrink-0">
                         <button
@@ -706,7 +720,20 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                         />
                       </div>
                       <div className="p-3">
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{photo.source.username}</p>
+                        {photo.instagramPostUrl ? (
+                          <a
+                            href={photo.instagramPostUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            @{photo.source.username}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{photo.source.username}</p>
+                        )}
                         <div className="mt-2 flex gap-2">
                           <button
                             onClick={(e) => {
