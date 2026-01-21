@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { Sparkles, Eye, Download, Copy, X, Check, Trash2, FileText, Layers } from 'lucide-react'
+import { Sparkles, Eye, Download, Copy, X, Check, Trash2, FileText, Layers, ChevronLeft, ChevronRight } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
 
@@ -37,7 +37,14 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
   const router = useRouter()
   const [photos, setPhotos] = useState<GeneratedPhoto[]>(initialPhotos)
   const [selectedPrompt, setSelectedPrompt] = useState<{ id: string; prompt: string } | null>(null)
-  const [selectedImage, setSelectedImage] = useState<{ id: string; url: string; prompt: string } | null>(null)
+  const [selectedImage, setSelectedImage] = useState<{
+    id: string
+    url: string
+    prompt: string
+    // Pour la navigation dans les carrousels
+    allImages: { id: string; url: string; prompt: string }[]
+    currentIndex: number
+  } | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isDownloadingZip, setIsDownloadingZip] = useState(false)
   const [downloadingCarouselId, setDownloadingCarouselId] = useState<string | null>(null)
@@ -203,6 +210,65 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
     toast.success('Prompt copie')
   }
 
+  // Ouvrir l'aperçu avec navigation pour les carrousels
+  const openImagePreview = (photo: GeneratedPhoto, carouselPhotos?: GeneratedPhoto[]) => {
+    const allImages = carouselPhotos
+      ? carouselPhotos.map(p => ({
+          id: p.id,
+          url: p.localPath || `/api/images/generated/${p.id}`,
+          prompt: p.prompt
+        }))
+      : [{ id: photo.id, url: photo.localPath || `/api/images/generated/${photo.id}`, prompt: photo.prompt }]
+
+    const currentIndex = carouselPhotos
+      ? carouselPhotos.findIndex(p => p.id === photo.id)
+      : 0
+
+    setSelectedImage({
+      id: photo.id,
+      url: photo.localPath || `/api/images/generated/${photo.id}`,
+      prompt: photo.prompt,
+      allImages,
+      currentIndex: currentIndex >= 0 ? currentIndex : 0
+    })
+  }
+
+  // Navigation dans l'aperçu
+  const navigatePreview = useCallback((direction: 'prev' | 'next') => {
+    if (!selectedImage || selectedImage.allImages.length <= 1) return
+
+    const newIndex = direction === 'prev'
+      ? (selectedImage.currentIndex - 1 + selectedImage.allImages.length) % selectedImage.allImages.length
+      : (selectedImage.currentIndex + 1) % selectedImage.allImages.length
+
+    const newImage = selectedImage.allImages[newIndex]
+    setSelectedImage({
+      ...selectedImage,
+      id: newImage.id,
+      url: newImage.url,
+      prompt: newImage.prompt,
+      currentIndex: newIndex
+    })
+  }, [selectedImage])
+
+  // Raccourcis clavier pour la navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!selectedImage) return
+
+      if (e.key === 'Escape') {
+        setSelectedImage(null)
+      } else if (e.key === 'ArrowLeft') {
+        navigatePreview('prev')
+      } else if (e.key === 'ArrowRight') {
+        navigatePreview('next')
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [selectedImage, navigatePreview])
+
   return (
     <>
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 h-fit">
@@ -335,11 +401,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                       <div key={photo.id} className="relative flex-shrink-0">
                         <div
                           className="relative w-36 h-48 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all"
-                          onClick={() => setSelectedImage({
-                            id: photo.id,
-                            url: photo.localPath || `/api/images/generated/${photo.id}`,
-                            prompt: photo.prompt
-                          })}
+                          onClick={() => openImagePreview(photo, carouselPhotos)}
                         >
                           {/* Badge position dans le carrousel */}
                           <span className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full z-10 font-medium">
@@ -453,11 +515,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                           {/* Bouton voir la photo + prompt */}
                           <div className="flex gap-2">
                             <button
-                              onClick={() => setSelectedImage({
-                                id: photo.id,
-                                url: photo.localPath || `/api/images/generated/${photo.id}`,
-                                prompt: photo.prompt
-                              })}
+                              onClick={() => openImagePreview(photo)}
                               className="flex-1 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
                             >
                               <Eye className="w-4 h-4" />
@@ -506,6 +564,23 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
               <X className="w-8 h-8" />
             </button>
 
+            {/* Compteur de position (si carrousel) */}
+            {selectedImage.allImages.length > 1 && (
+              <div className="absolute -top-12 left-0 px-3 py-1 bg-white/10 text-white text-sm rounded-full">
+                {selectedImage.currentIndex + 1} / {selectedImage.allImages.length}
+              </div>
+            )}
+
+            {/* Flèche gauche */}
+            {selectedImage.allImages.length > 1 && (
+              <button
+                onClick={() => navigatePreview('prev')}
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-3 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-10"
+              >
+                <ChevronLeft className="w-8 h-8" />
+              </button>
+            )}
+
             {/* Image */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -513,6 +588,16 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
               alt="Photo generee"
               className="max-w-full max-h-[80vh] object-contain rounded-lg mx-auto"
             />
+
+            {/* Flèche droite */}
+            {selectedImage.allImages.length > 1 && (
+              <button
+                onClick={() => navigatePreview('next')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-3 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors z-10"
+              >
+                <ChevronRight className="w-8 h-8" />
+              </button>
+            )}
 
             {/* Actions en bas */}
             <div className="mt-4 flex items-center justify-center gap-3">
