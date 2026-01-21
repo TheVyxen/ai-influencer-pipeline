@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import {
   ArrowLeft,
@@ -22,7 +23,8 @@ import {
   Sparkles,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  LogOut
 } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useTheme } from '@/components/ThemeProvider'
@@ -48,8 +50,13 @@ interface ApiStatus {
  * - Options de génération d'image
  */
 export default function SettingsPage() {
+  const router = useRouter()
+
   // Hook pour le thème
   const { theme, setTheme } = useTheme()
+
+  // État pour la déconnexion
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   // États pour les settings
   const [settings, setSettings] = useState<Record<string, string>>({})
@@ -79,6 +86,19 @@ export default function SettingsPage() {
 
   // Provider actuel
   const currentProvider = settings.image_provider || 'gemini'
+
+  // Fonction de déconnexion
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' })
+      router.push('/login')
+      router.refresh()
+    } catch {
+      toast.error('Erreur lors de la déconnexion')
+      setIsLoggingOut(false)
+    }
+  }
 
   // Charger les settings au montage
   useEffect(() => {
@@ -247,13 +267,27 @@ export default function SettingsPage() {
               <Settings className="w-6 h-6 text-gray-600 dark:text-gray-400" />
               <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
             </div>
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Retour au dashboard
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/"
+                className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Retour au dashboard
+              </Link>
+              <button
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isLoggingOut ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <LogOut className="w-4 h-4" />
+                )}
+                Deconnexion
+              </button>
+            </div>
           </div>
         </div>
       </header>

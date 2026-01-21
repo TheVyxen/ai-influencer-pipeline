@@ -64,8 +64,10 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
 ```
 /app
   /page.tsx                    # Dashboard principal avec StatsBar
+  /login/page.tsx              # Page de connexion (auth)
   /settings/page.tsx           # Configuration avec test API + provider
   /api/
+    /auth/                     # Authentification (login, logout)
     /sources/                  # CRUD sources Instagram
     /photos/                   # Gestion photos (approve, reject, describe, generate)
     /scrape/                   # Scraping Instagram
@@ -87,12 +89,14 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
   /GeneratedGallery.tsx        # Galerie photos générées
   /StatsBar.tsx                # Barre de statistiques
 /lib
+  /auth.ts                     # Authentification (signToken, verifyToken)
   /prisma.ts                   # Client Prisma
   /utils.ts                    # Fonctions utilitaires
   /apify.ts                    # Service Apify
   /google-ai.ts                # Service Google AI (description + génération Gemini)
   /wavespeed.ts                # Service Wavespeed (génération alternative)
   /exif-remover.ts             # Suppression EXIF
+/middleware.ts                 # Protection des routes par authentification
 /prisma
   /schema.prisma               # Schéma BDD
 /public
@@ -115,6 +119,28 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
 - `image_provider` : Provider de génération (gemini, wavespeed) - défaut: gemini
 - `image_aspect_ratio` : Format d'image (9:16, 1:1, 16:9) - défaut: 9:16
 - `image_size` : Qualité d'image (1K, 2K, 4K) - défaut: 2K
+
+## Authentification
+
+L'application est protégée par un mot de passe unique.
+
+### Fonctionnement
+- Un middleware Next.js (`middleware.ts`) intercepte toutes les requêtes
+- Sans cookie valide → redirection vers `/login`
+- Le cookie `auth-token` est signé avec HMAC SHA256 (clé: `APP_SECRET`)
+- Session valide 7 jours
+
+### Configuration
+1. Définir `APP_PASSWORD` dans les variables d'environnement
+2. Définir `APP_SECRET` (clé secrète pour signer les cookies, min 32 caractères)
+3. Se connecter via `/login` avec le mot de passe
+4. Se déconnecter via le bouton dans Settings
+
+### Sécurité
+- Cookie HTTP-only (non accessible en JavaScript)
+- Cookie Secure en production (HTTPS uniquement)
+- Signature HMAC pour éviter la falsification
+- Expiration automatique après 7 jours
 
 ## Fonctionnalités UX
 
@@ -171,6 +197,8 @@ APIFY_API_KEY=""
 GOOGLE_AI_API_KEY=""
 WAVESPEED_API_KEY=""       # Optionnel, requis si provider=wavespeed
 NEXT_PUBLIC_APP_URL=""     # URL publique après déploiement (requis pour Wavespeed)
+APP_PASSWORD=""            # Mot de passe pour accéder à l'application
+APP_SECRET=""              # Clé secrète pour signer les cookies (min 32 caractères)
 ```
 
 ## Logique métier importante
