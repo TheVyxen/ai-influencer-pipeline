@@ -1,29 +1,11 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { Sparkles, Eye, Download, Copy, X, Check, Trash2, FileText, Layers, ChevronLeft, ChevronRight, ZoomIn, CheckSquare, Square } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
-
-interface GeneratedPhoto {
-  id: string
-  prompt: string
-  localPath: string | null
-  createdAt: string
-  // Champs carrousel
-  isCarousel?: boolean
-  carouselId?: string | null
-  carouselIndex?: number | null
-  carouselTotal?: number | null
-  sourcePhoto: {
-    id: string
-    source: {
-      username: string
-    }
-  }
-}
+import { useGeneratedPhotos, refreshGeneratedPhotos, type GeneratedPhoto } from '@/lib/hooks/use-photos'
 
 interface GeneratedGalleryProps {
   photos: GeneratedPhoto[]
@@ -32,10 +14,13 @@ interface GeneratedGalleryProps {
 /**
  * Section des photos generees via Gemini 3
  * Supporte l'affichage groupe des carrousels
+ * Utilise SWR pour le rafraîchissement automatique
  */
 export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProps) {
-  const router = useRouter()
-  const [photos, setPhotos] = useState<GeneratedPhoto[]>(initialPhotos)
+  // Utiliser SWR pour les photos avec les données initiales comme fallback
+  const { photos: swrPhotos } = useGeneratedPhotos()
+  // Utiliser les données SWR si disponibles, sinon les données initiales
+  const photos = swrPhotos.length > 0 || initialPhotos.length === 0 ? swrPhotos : initialPhotos
   const [selectedPrompt, setSelectedPrompt] = useState<{ id: string; prompt: string } | null>(null)
   const [selectedImage, setSelectedImage] = useState<{
     id: string
@@ -179,7 +164,6 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
 
         if (!res.ok) throw new Error('Delete failed')
 
-        setPhotos(prev => prev.filter(p => p.id !== id))
         setSelectedIds(prev => {
           const newSet = new Set(prev)
           newSet.delete(id)
@@ -194,7 +178,8 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
 
     if (successCount > 0) {
       toast.success(`${successCount} photo(s) supprimee(s)`)
-      router.refresh()
+      // Rafraîchir les données via SWR
+      await refreshGeneratedPhotos()
     }
     if (errorCount > 0) {
       toast.error(`${errorCount} erreur(s) lors de la suppression`)

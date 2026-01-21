@@ -264,6 +264,15 @@ export async function importScrapedPhoto(
     return null
   }
 
+  // Parser la date de publication Instagram
+  let instagramPublishedAt: Date | null = null
+  if (photo.timestamp) {
+    const parsed = new Date(photo.timestamp)
+    if (!isNaN(parsed.getTime())) {
+      instagramPublishedAt = parsed
+    }
+  }
+
   // Créer l'entrée dans la base de données avec les infos carrousel
   // NOTE: localPath n'est plus utilisé sur Vercel, on garde originalUrl
   const sourcePhoto = await prisma.sourcePhoto.create({
@@ -272,6 +281,7 @@ export async function importScrapedPhoto(
       originalUrl: photo.url,
       localPath: null, // Plus de stockage local sur Vercel
       instagramPostUrl: photo.postUrl,
+      instagramPublishedAt, // Date de publication sur Instagram
       status: 'pending',
       description: photo.caption?.substring(0, 500) || null, // Limiter la description
       // Champs carrousel

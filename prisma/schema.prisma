@@ -22,15 +22,16 @@ model Source {
 
 // Photos scrapées depuis Instagram
 model SourcePhoto {
-  id               String           @id @default(cuid())
-  sourceId         String           // Référence au compte source
-  source           Source           @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  originalUrl      String           // URL originale de la photo Instagram
-  localPath        String?          // Chemin local après téléchargement
-  status           String           @default("pending") // pending | approved | rejected
-  description      String?          // Description courte (legacy)
-  generatedPrompt  String?          // Prompt complet généré par Google AI Gemini
-  instagramPostUrl String?          // URL du post Instagram original
+  id                   String           @id @default(cuid())
+  sourceId             String           // Référence au compte source
+  source               Source           @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  originalUrl          String           // URL originale de la photo Instagram
+  localPath            String?          // Chemin local après téléchargement
+  status               String           @default("pending") // pending | approved | rejected
+  description          String?          // Description courte (legacy)
+  generatedPrompt      String?          // Prompt complet généré par Google AI Gemini
+  instagramPostUrl     String?          // URL du post Instagram original
+  instagramPublishedAt DateTime?        // Date de publication sur Instagram
 
   // Champs pour les carrousels Instagram
   isCarousel       Boolean          @default(false) // true si fait partie d'un carrousel
@@ -46,6 +47,7 @@ model SourcePhoto {
   @@index([status])
   @@index([sourceId])
   @@index([carouselId])
+  @@index([instagramPublishedAt])
 }
 
 // Photos générées via Gemini 3 Pro Image ou Wavespeed

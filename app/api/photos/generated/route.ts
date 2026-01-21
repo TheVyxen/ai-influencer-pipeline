@@ -24,7 +24,20 @@ export async function GET() {
       }
     })
 
-    return NextResponse.json(photos)
+    // Transformer les dates en ISO string pour le client
+    const photosData = photos.map(p => ({
+      id: p.id,
+      prompt: p.prompt,
+      localPath: p.localPath,
+      createdAt: p.createdAt.toISOString(),
+      isCarousel: p.isCarousel,
+      carouselId: p.carouselId,
+      carouselIndex: p.carouselIndex,
+      carouselTotal: p.carouselTotal,
+      sourcePhoto: p.sourcePhoto
+    }))
+
+    return NextResponse.json(photosData)
   } catch (error) {
     console.error('Error fetching generated photos:', error)
     return NextResponse.json(

@@ -25,7 +25,12 @@ export default async function Home() {
     }),
     prisma.sourcePhoto.findMany({
       where: { status: 'pending' },
-      orderBy: { createdAt: 'desc' },
+      // Trier par date de publication Instagram (plus récent en premier)
+      // Fallback sur createdAt si instagramPublishedAt est null
+      orderBy: [
+        { instagramPublishedAt: { sort: 'desc', nulls: 'last' } },
+        { createdAt: 'desc' }
+      ],
       include: {
         source: {
           select: { username: true }
@@ -68,6 +73,7 @@ export default async function Home() {
     status: p.status,
     createdAt: p.createdAt.toISOString(),
     instagramPostUrl: p.instagramPostUrl,
+    instagramPublishedAt: p.instagramPublishedAt?.toISOString() || null,
     // Champs carrousel
     isCarousel: p.isCarousel,
     carouselId: p.carouselId,

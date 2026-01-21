@@ -1,6 +1,7 @@
 'use client'
 
 import { Users, Clock, Activity, Sparkles } from 'lucide-react'
+import { useStats } from '@/lib/hooks/use-photos'
 
 interface StatsBarProps {
   sourcesCount: number
@@ -12,13 +13,22 @@ interface StatsBarProps {
 /**
  * Barre de statistiques en haut du dashboard
  * Workflow simplifié : Sources → En attente → Générées
+ * Utilise SWR pour le rafraîchissement automatique
  */
 export function StatsBar({
-  sourcesCount,
-  pendingCount,
-  generatedCount,
-  lastActivity,
+  sourcesCount: initialSourcesCount,
+  pendingCount: initialPendingCount,
+  generatedCount: initialGeneratedCount,
+  lastActivity: initialLastActivity,
 }: StatsBarProps) {
+  // Utiliser SWR pour les stats avec les données initiales comme fallback
+  const { stats: swrStats } = useStats()
+
+  // Utiliser les données SWR si disponibles, sinon les données initiales
+  const sourcesCount = swrStats?.sourcesCount ?? initialSourcesCount
+  const pendingCount = swrStats?.pendingCount ?? initialPendingCount
+  const generatedCount = swrStats?.generatedCount ?? initialGeneratedCount
+  const lastActivity = swrStats?.lastActivity ?? initialLastActivity
   const stats = [
     {
       label: 'Sources',

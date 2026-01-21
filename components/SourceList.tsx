@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { Plus, RefreshCw, Trash2, Users } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
+import { refreshAllData } from '@/lib/hooks/use-photos'
 
 interface Source {
   id: string
@@ -32,9 +32,9 @@ interface SourceListProps {
 
 /**
  * Colonne gauche : Liste des sources Instagram
+ * Utilise SWR pour rafraîchir les données après scraping
  */
 export function SourceList({ initialSources }: SourceListProps) {
-  const router = useRouter()
   const [sources, setSources] = useState<Source[]>(initialSources)
   const [username, setUsername] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -72,7 +72,8 @@ export function SourceList({ initialSources }: SourceListProps) {
       setSources(prev => [{ ...newSource, _count: { photos: 0 } }, ...prev])
       setUsername('')
       toast.success(`@${newSource.username} ajouté avec succès`)
-      router.refresh()
+      // Rafraîchir les stats via SWR
+      await refreshAllData()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Une erreur est survenue')
     } finally {
@@ -95,7 +96,8 @@ export function SourceList({ initialSources }: SourceListProps) {
 
       setSources(prev => prev.filter(s => s.id !== deleteModal.source!.id))
       toast.success(`@${deleteModal.source.username} supprimé`)
-      router.refresh()
+      // Rafraîchir les données via SWR (les photos associées sont supprimées)
+      await refreshAllData()
     } catch (err) {
       toast.error('Erreur lors de la suppression')
       console.error('Error deleting source:', err)
@@ -131,7 +133,8 @@ export function SourceList({ initialSources }: SourceListProps) {
             ? { ...s, _count: { photos: s._count.photos + result.photosImported } }
             : s
         ))
-        router.refresh()
+        // Rafraîchir les photos pending via SWR
+        await refreshAllData()
       } else if (result.photosSkipped > 0) {
         toast.success(`Aucune nouvelle photo (${result.photosSkipped} doublon(s))`, { id: toastId })
       } else {
@@ -175,7 +178,8 @@ export function SourceList({ initialSources }: SourceListProps) {
       let message = ''
       if (totals.photosImported > 0) {
         message = `${totals.photosImported} photo(s) importée(s) au total`
-        router.refresh()
+        // Rafraîchir les photos pending via SWR
+        await refreshAllData()
       } else if (totals.photosSkipped > 0) {
         message = `Aucune nouvelle photo (${totals.photosSkipped} doublon(s))`
       } else {
