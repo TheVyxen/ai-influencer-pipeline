@@ -24,7 +24,9 @@ import {
   Sun,
   Moon,
   Monitor,
-  LogOut
+  LogOut,
+  Clock,
+  RefreshCw
 } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { useTheme } from '@/components/ThemeProvider'
@@ -585,10 +587,10 @@ export default function SettingsPage() {
           <div className="space-y-4">
             {/* Posts par scrape */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Posts par scrape
               </label>
-              <p className="text-xs text-gray-500 mb-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                 Nombre de posts à récupérer par compte Instagram (1-50)
               </p>
               <input
@@ -599,6 +601,78 @@ export default function SettingsPage() {
                 onChange={(e) => updateSetting('posts_per_scrape', e.target.value)}
                 className="w-32 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+            </div>
+
+            {/* Scraping automatique */}
+            <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Scraping automatique
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Scraper automatiquement toutes les sources à intervalle régulier.
+              </p>
+
+              {/* Toggle activer/désactiver */}
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  {settings.auto_scrape_enabled === 'true' ? 'Activé' : 'Désactivé'}
+                </span>
+                <button
+                  onClick={() => updateSetting('auto_scrape_enabled', settings.auto_scrape_enabled === 'true' ? 'false' : 'true')}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    settings.auto_scrape_enabled === 'true'
+                      ? 'bg-blue-600'
+                      : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      settings.auto_scrape_enabled === 'true' ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Sélection de l'intervalle */}
+              {settings.auto_scrape_enabled === 'true' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Intervalle
+                    </label>
+                    <select
+                      value={settings.auto_scrape_interval || '24'}
+                      onChange={(e) => updateSetting('auto_scrape_interval', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="3">Toutes les 3 heures</option>
+                      <option value="6">Toutes les 6 heures</option>
+                      <option value="12">Toutes les 12 heures</option>
+                      <option value="24">Toutes les 24 heures</option>
+                    </select>
+                  </div>
+
+                  {/* Dernier scrape */}
+                  {settings.last_auto_scrape && (
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <RefreshCw className="w-3 h-3" />
+                      <span>
+                        Dernier scrape : {new Date(settings.last_auto_scrape).toLocaleString('fr-FR')}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-xs text-blue-700 dark:text-blue-300">
+                      Le scraping automatique s&apos;exécute via Vercel Cron.
+                      Assurez-vous que l&apos;application est déployée sur Vercel pour que cette fonctionnalité soit active.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

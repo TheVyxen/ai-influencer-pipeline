@@ -70,7 +70,9 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
     /auth/                     # Authentification (login, logout)
     /sources/                  # CRUD sources Instagram
     /photos/                   # Gestion photos (approve, reject, describe, generate)
-    /scrape/                   # Scraping Instagram
+    /scrape/                   # Scraping Instagram (manuel)
+    /cron/scrape/              # Scraping automatique (Vercel Cron)
+    /stats/                    # Statistiques du dashboard
     /settings/                 # Clés API
     /reference/                # Photo de référence
     /test-api/                 # Test connexion APIs (Google AI, Wavespeed, Apify)
@@ -96,6 +98,8 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
   /google-ai.ts                # Service Google AI (description + génération Gemini)
   /wavespeed.ts                # Service Wavespeed (génération alternative)
   /exif-remover.ts             # Suppression EXIF
+  /hooks/
+    /use-photos.ts             # Hooks SWR (usePendingPhotos, useGeneratedPhotos, useStats)
 /middleware.ts                 # Protection des routes par authentification
 /prisma
   /schema.prisma               # Schéma BDD
@@ -119,6 +123,35 @@ Le workflow : Scraping Instagram → Validation manuelle → Description IA → 
 - `image_provider` : Provider de génération (gemini, wavespeed) - défaut: gemini
 - `image_aspect_ratio` : Format d'image (9:16, 1:1, 16:9) - défaut: 9:16
 - `image_size` : Qualité d'image (1K, 2K, 4K) - défaut: 2K
+- `auto_scrape_enabled` : Activer le scraping automatique (true/false) - défaut: false
+- `auto_scrape_interval` : Intervalle en heures (3, 6, 12, 24) - défaut: 24
+- `last_auto_scrape` : Timestamp du dernier scrape automatique
+
+## Scraping automatique (Vercel Cron)
+
+Le scraping automatique permet de récupérer les nouvelles photos des sources Instagram à intervalle régulier.
+
+### Fonctionnement
+- Un cron job Vercel s'exécute toutes les heures (`0 * * * *`)
+- L'endpoint `/api/cron/scrape` vérifie :
+  1. Si le scraping auto est activé (`auto_scrape_enabled`)
+  2. Si l'intervalle configuré est écoulé depuis le dernier scrape
+- Si les conditions sont remplies, scrape toutes les sources actives
+
+### Configuration
+1. Aller dans Settings
+2. Section "Configuration du scraping"
+3. Activer le toggle "Scraping automatique"
+4. Choisir l'intervalle (3h, 6h, 12h, 24h)
+5. Sauvegarder
+
+### Sécurité
+- L'endpoint cron peut être protégé par `CRON_SECRET` (variable d'environnement)
+- Si défini, le header `Authorization: Bearer <CRON_SECRET>` est requis
+
+### Prérequis
+- L'application doit être déployée sur Vercel
+- Le cron ne fonctionne pas en local (utiliser le scrape manuel)
 
 ## Authentification
 
@@ -199,6 +232,7 @@ WAVESPEED_API_KEY=""       # Optionnel, requis si provider=wavespeed
 NEXT_PUBLIC_APP_URL=""     # URL publique après déploiement (requis pour Wavespeed)
 APP_PASSWORD=""            # Mot de passe pour accéder à l'application
 APP_SECRET=""              # Clé secrète pour signer les cookies (min 32 caractères)
+CRON_SECRET=""             # Optionnel, sécurise l'endpoint cron (Vercel le définit auto)
 ```
 
 ## Logique métier importante
