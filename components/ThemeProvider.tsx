@@ -88,11 +88,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [theme, mounted])
 
-  // Éviter le flash de thème incorrect au premier rendu
-  if (!mounted) {
-    return <>{children}</>
-  }
-
+  // Toujours fournir le contexte, même avant le montage (pour SSG)
+  // Les valeurs par défaut sont utilisées avant l'hydratation côté client
   return (
     <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
       {children}

@@ -171,7 +171,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
   }
 
   // Approuver une photo (workflow complet : approve + describe + generate)
-  const handleApprove = async (id: string) => {
+  const handleApprove = useCallback(async (id: string) => {
     setProcessingId(id)
     const toastId = toast.loading('Validation et génération en cours...', { duration: Infinity })
 
@@ -201,7 +201,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
     } finally {
       setProcessingId(null)
     }
-  }
+  }, [router])
 
   // Rejeter une photo (avec confirmation)
   const handleReject = async (ids: string[]) => {
@@ -378,7 +378,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
         setRejectModal({ isOpen: true, photoIds: [photos[currentPhotoIndex].id] })
       }
     }
-  }, [photos, currentPhotoIndex, previewModal.isOpen, navigatePreview])
+  }, [photos, currentPhotoIndex, previewModal.isOpen, navigatePreview, handleApprove])
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown)
