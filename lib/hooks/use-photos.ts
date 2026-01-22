@@ -77,8 +77,8 @@ export function usePendingPhotos() {
     SWR_KEYS.pendingPhotos,
     fetcher,
     {
-      // Revalider toutes les 30 secondes
-      refreshInterval: 30000,
+      // Désactiver le polling automatique (économie de bande passante)
+      refreshInterval: 0,
       // Revalider quand la fenêtre reprend le focus
       revalidateOnFocus: true,
     }
@@ -100,8 +100,8 @@ export function useGeneratedPhotos() {
     SWR_KEYS.generatedPhotos,
     fetcher,
     {
-      // Revalider toutes les 30 secondes
-      refreshInterval: 30000,
+      // Désactiver le polling automatique (économie de bande passante)
+      refreshInterval: 0,
       // Revalider quand la fenêtre reprend le focus
       revalidateOnFocus: true,
     }
@@ -123,8 +123,8 @@ export function useStats() {
     SWR_KEYS.stats,
     fetcher,
     {
-      // Revalider toutes les 30 secondes
-      refreshInterval: 30000,
+      // Désactiver le polling automatique (économie de bande passante)
+      refreshInterval: 0,
       // Revalider quand la fenêtre reprend le focus
       revalidateOnFocus: true,
     }
