@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
-import { Sparkles, Eye, Download, Copy, X, Check, Trash2, FileText, Layers, ChevronLeft, ChevronRight, ZoomIn, CheckSquare, Square } from 'lucide-react'
+import { Sparkles, Download, Copy, X, Check, Trash2, FileText, Layers, ChevronLeft, ChevronRight, ZoomIn, CheckSquare, Square } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
 import { useGeneratedPhotos, refreshGeneratedPhotos, type GeneratedPhoto } from '@/lib/hooks/use-photos'
@@ -450,91 +450,77 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                 </div>
               ))}
 
-              {/* Affichage des photos individuelles */}
+              {/* Affichage des photos individuelles - meme style que les carrousels */}
               {groupedPhotos.singles.length > 0 && (
-                <div className="grid grid-cols-2 gap-4">
-                  {groupedPhotos.singles.map((photo) => (
-                    <div
-                      key={photo.id}
-                      className={`bg-white dark:bg-gray-900 rounded-lg shadow-sm border overflow-hidden hover:shadow-md dark:hover:shadow-gray-900 transition-all ${
-                        selectedIds.has(photo.id)
-                          ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
-                          : 'border-gray-100 dark:border-gray-800'
-                      }`}
-                    >
-                      <div className="aspect-square relative bg-gray-100 dark:bg-gray-800">
-                        {/* Checkbox de selection */}
-                        <div className="absolute top-2 left-2 z-10">
+                <div
+                  className="border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4 bg-blue-50/50 dark:bg-blue-950/30"
+                >
+                  {/* Header des photos solos */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="w-4 h-4 text-blue-500" />
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                      Photos ({groupedPhotos.singles.length})
+                    </span>
+                  </div>
+
+                  {/* Images en scroll horizontal */}
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {groupedPhotos.singles.map((photo) => (
+                      <div key={photo.id} className="relative flex-shrink-0 w-32">
+                        <div
+                          className="relative w-32 h-40 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden cursor-pointer group"
+                          onClick={() => openImagePreview(photo, groupedPhotos.singles)}
+                        >
+                          {/* Overlay hover pour zoom */}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-all z-10">
+                            <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+
+                          {/* Checkbox de selection */}
                           <button
-                            onClick={() => toggleSelection(photo.id)}
-                            className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleSelection(photo.id)
+                            }}
+                            className={`absolute top-1.5 right-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all z-10 ${
                               selectedIds.has(photo.id)
                                 ? 'bg-blue-500 border-blue-500 text-white'
-                                : 'bg-white/80 dark:bg-gray-800/80 border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                                : 'bg-white/80 border-gray-300 hover:border-blue-400'
                             }`}
                           >
                             {selectedIds.has(photo.id) && (
-                              <Check className="w-4 h-4" strokeWidth={3} />
+                              <Check className="w-3 h-3" strokeWidth={3} />
                             )}
                           </button>
+
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.localPath || `/api/images/generated/${photo.id}`}
+                            alt="Photo generee"
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
                         </div>
 
-                        {/* Badge genere */}
-                        <div className="absolute top-2 right-2 z-10">
-                          <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-400 rounded-full">
-                            Generee
-                          </span>
-                        </div>
-
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={photo.localPath || `/api/images/generated/${photo.id}`}
-                          alt="Photo generee"
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="p-3">
-                        <p className="text-xs text-gray-400 dark:text-gray-500">
-                          {new Intl.DateTimeFormat('fr-FR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          }).format(new Date(photo.createdAt))}
-                        </p>
-
-                        <div className="mt-2 space-y-2">
-                          {/* Bouton voir la photo + prompt */}
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => openImagePreview(photo)}
-                              className="flex-1 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
-                            >
-                              <Eye className="w-4 h-4" />
-                              Voir
-                            </button>
-                            <button
-                              onClick={() => setSelectedPrompt({ id: photo.id, prompt: photo.prompt })}
-                              className="py-1.5 px-2.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-                              title="Voir le prompt"
-                            >
-                              <FileText className="w-4 h-4" />
-                            </button>
-                          </div>
-
-                          {/* Bouton telecharger */}
+                        {/* Boutons sous l'image - meme style que carrousels */}
+                        <div className="flex gap-1 mt-2">
+                          <button
+                            onClick={() => setSelectedPrompt({ id: photo.id, prompt: photo.prompt })}
+                            className="flex-1 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded text-xs hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1"
+                            title="Voir le prompt"
+                          >
+                            <FileText className="w-3 h-3" />
+                          </button>
                           <button
                             onClick={() => handleDownload(photo)}
-                            className="w-full py-1.5 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-1"
+                            className="flex-1 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors flex items-center justify-center"
+                            title="Telecharger"
                           >
-                            <Download className="w-4 h-4" />
-                            Telecharger
+                            <Download className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </>
