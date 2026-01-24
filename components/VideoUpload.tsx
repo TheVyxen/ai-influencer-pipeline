@@ -1,17 +1,22 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Upload, X, Image as ImageIcon, Trash2 } from 'lucide-react'
+import { Upload, X, Image as ImageIcon, Trash2, Check } from 'lucide-react'
 import { Button } from './ui/button'
 import { ConfirmModal } from './ui/ConfirmModal'
 import toast from 'react-hot-toast'
 import { useVideoSources, refreshVideoSources, VideoSource } from '@/lib/hooks/use-videos'
 
+interface VideoUploadProps {
+  selectedSourceId: string
+  onSelectSource: (id: string) => void
+}
+
 /**
  * Composant pour uploader des images sources pour la génération vidéo
  * Supporte le drag & drop et l'upload classique
  */
-export function VideoUpload() {
+export function VideoUpload({ selectedSourceId, onSelectSource }: VideoUploadProps) {
   const { sources, isLoading, isError } = useVideoSources()
   const [isDragging, setIsDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -49,6 +54,7 @@ export function VideoUpload() {
   const uploadFiles = async (files: File[]) => {
     setUploading(true)
     let successCount = 0
+    let lastUploadedId: string | null = null
 
     for (const file of files) {
       try {
@@ -65,6 +71,8 @@ export function VideoUpload() {
           throw new Error(error.error || 'Upload failed')
         }
 
+        const data = await response.json()
+        lastUploadedId = data.id
         successCount++
       } catch (error) {
         toast.error(`Erreur: ${file.name} - ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
@@ -74,6 +82,10 @@ export function VideoUpload() {
     if (successCount > 0) {
       toast.success(`${successCount} image(s) uploadée(s)`)
       await refreshVideoSources()
+      // Auto-sélectionner la dernière image uploadée
+      if (lastUploadedId) {
+        onSelectSource(lastUploadedId)
+      }
     }
 
     setUploading(false)
@@ -173,11 +185,16 @@ export function VideoUpload() {
       )}
 
       {sources.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {sources.map((source) => (
-            <div
+            <button
               key={source.id}
-              className="relative group aspect-[9/16] rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800"
+              onClick={() => onSelectSource(source.id)}
+              className={`relative group aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                selectedSourceId === source.id
+                  ? 'border-blue-500 ring-2 ring-blue-500/50'
+                  : 'border-transparent hover:border-gray-400'
+              }`}
             >
               {/* Image preview */}
               <img
@@ -186,22 +203,25 @@ export function VideoUpload() {
                 className="w-full h-full object-cover"
               />
 
-              {/* Overlay avec nom et bouton supprimer */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="absolute bottom-0 left-0 right-0 p-2">
-                  <p className="text-xs text-white truncate">
-                    {source.originalName}
-                  </p>
+              {/* Indicateur de sélection */}
+              {selectedSourceId === source.id && (
+                <div className="absolute top-1 right-1 bg-blue-500 rounded-full p-0.5">
+                  <Check className="w-3 h-3 text-white" />
                 </div>
-                <button
-                  onClick={() => setDeleteTarget(source)}
-                  className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                  title="Supprimer"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+              )}
+
+              {/* Bouton supprimer au survol */}
+              <div
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDeleteTarget(source)
+                }}
+                className="absolute top-1 left-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                title="Supprimer"
+              >
+                <Trash2 className="w-3 h-3" />
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}

@@ -1,17 +1,29 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { VideoUpload } from '@/components/VideoUpload'
 import { VideoSettings } from '@/components/VideoSettings'
 import { VideoGallery } from '@/components/VideoGallery'
+import { useVideoSources } from '@/lib/hooks/use-videos'
 import { ArrowLeft, Video, Settings } from 'lucide-react'
-
-// Force le rendu dynamique
-export const dynamic = 'force-dynamic'
 
 /**
  * Page de génération vidéo
  * Workflow : Upload image → Configurer → Générer → Visualiser
  */
 export default function VideosPage() {
+  const { sources } = useVideoSources()
+  const [selectedSourceId, setSelectedSourceId] = useState<string>('')
+
+  // Auto-sélectionner la première source si aucune n'est sélectionnée
+  useEffect(() => {
+    if (sources.length > 0 && !selectedSourceId) {
+      setSelectedSourceId(sources[0].id)
+    } else if (sources.length === 0) {
+      setSelectedSourceId('')
+    }
+  }, [sources, selectedSourceId])
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       {/* Header */}
@@ -66,16 +78,14 @@ export default function VideosPage() {
 
         {/* Layout 2 colonnes */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Colonne gauche : Upload + Settings */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Zone d'upload */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
-              <VideoUpload />
-            </div>
-
-            {/* Paramètres de génération */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
-              <VideoSettings />
+          {/* Colonne gauche : Upload + Settings fusionnés */}
+          <div className="lg:col-span-1">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 space-y-6">
+              <VideoUpload
+                selectedSourceId={selectedSourceId}
+                onSelectSource={setSelectedSourceId}
+              />
+              <VideoSettings selectedSourceId={selectedSourceId} />
             </div>
           </div>
 

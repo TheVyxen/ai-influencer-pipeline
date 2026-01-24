@@ -1,46 +1,26 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { Play, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { Play, Loader2, Smartphone, Monitor } from 'lucide-react'
 import { Button } from './ui/button'
 import toast from 'react-hot-toast'
-import { useVideoSources, refreshGeneratedVideos, VideoSource } from '@/lib/hooks/use-videos'
+import { refreshGeneratedVideos } from '@/lib/hooks/use-videos'
 
 interface VideoSettingsProps {
+  selectedSourceId: string
   onGenerationStarted?: () => void
 }
 
 /**
  * Composant pour configurer et lancer la génération vidéo
  */
-export function VideoSettings({ onGenerationStarted }: VideoSettingsProps) {
-  const { sources } = useVideoSources()
-
+export function VideoSettings({ selectedSourceId, onGenerationStarted }: VideoSettingsProps) {
   // Paramètres de génération
-  const [selectedSourceId, setSelectedSourceId] = useState<string>('')
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('9:16')
   const [duration, setDuration] = useState<5 | 6 | 7 | 8>(5)
   const [resolution, setResolution] = useState<'720p' | '1080p' | '4k'>('1080p')
   const [prompt, setPrompt] = useState('')
   const [generating, setGenerating] = useState(false)
-
-  // Référence pour tracker le nombre précédent de sources
-  const prevSourcesLength = useRef(sources.length)
-
-  // Auto-sélection de la dernière image uploadée
-  useEffect(() => {
-    if (sources.length > prevSourcesLength.current) {
-      // Une nouvelle source a été ajoutée, la sélectionner automatiquement
-      setSelectedSourceId(sources[0].id)
-    } else if (sources.length > 0 && !selectedSourceId) {
-      // Aucune source sélectionnée, sélectionner la première
-      setSelectedSourceId(sources[0].id)
-    } else if (sources.length === 0) {
-      // Plus de sources, reset la sélection
-      setSelectedSourceId('')
-    }
-    prevSourcesLength.current = sources.length
-  }, [sources, selectedSourceId])
 
   // Lancer la génération
   const handleGenerate = async () => {
@@ -92,26 +72,6 @@ export function VideoSettings({ onGenerationStarted }: VideoSettingsProps) {
         Paramètres de génération
       </h3>
 
-      {/* Sélection de l'image source */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Image source
-        </label>
-        <select
-          value={selectedSourceId}
-          onChange={(e) => setSelectedSourceId(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          disabled={generating}
-        >
-          <option value="">Sélectionnez une image...</option>
-          {sources.map((source) => (
-            <option key={source.id} value={source.id}>
-              {source.originalName}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* Format */}
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -121,48 +81,62 @@ export function VideoSettings({ onGenerationStarted }: VideoSettingsProps) {
           <button
             onClick={() => setAspectRatio('9:16')}
             disabled={generating}
-            className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+            className={`flex-1 px-3 py-2 rounded-lg border transition-colors flex items-center justify-center gap-2 ${
               aspectRatio === '9:16'
                 ? 'bg-blue-600 text-white border-blue-600'
                 : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400'
             }`}
           >
-            9:16 Portrait
+            <Smartphone className="w-5 h-5" />
+            <span className="text-sm font-medium">9:16</span>
           </button>
           <button
             onClick={() => setAspectRatio('16:9')}
             disabled={generating}
-            className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+            className={`flex-1 px-3 py-2 rounded-lg border transition-colors flex items-center justify-center gap-2 ${
               aspectRatio === '16:9'
                 ? 'bg-blue-600 text-white border-blue-600'
                 : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400'
             }`}
           >
-            16:9 Paysage
+            <Monitor className="w-5 h-5" />
+            <span className="text-sm font-medium">16:9</span>
           </button>
         </div>
       </div>
 
       {/* Durée */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Durée
-        </label>
-        <div className="flex gap-2">
-          {([5, 6, 7, 8] as const).map((d) => (
-            <button
-              key={d}
-              onClick={() => setDuration(d)}
-              disabled={generating}
-              className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                duration === d
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400'
-              }`}
-            >
-              {d}s
-            </button>
-          ))}
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Durée
+          </label>
+          <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+            {duration}s
+          </span>
+        </div>
+        <div className="relative h-4 flex items-center">
+          <div className="absolute left-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg w-full" />
+          <div
+            className="absolute left-0 h-2 bg-blue-600 rounded-lg transition-all"
+            style={{ width: `${((duration - 5) / 3) * 100}%` }}
+          />
+          <input
+            type="range"
+            min="5"
+            max="8"
+            step="1"
+            value={duration}
+            onChange={(e) => setDuration(Number(e.target.value) as 5 | 6 | 7 | 8)}
+            disabled={generating}
+            className="absolute w-full h-4 bg-transparent rounded-lg appearance-none cursor-pointer z-10 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-blue-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:bg-blue-600 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+          />
+        </div>
+        <div className="flex justify-between text-xs text-gray-400 mt-1">
+          <span>5s</span>
+          <span>6s</span>
+          <span>7s</span>
+          <span>8s</span>
         </div>
       </div>
 
@@ -210,7 +184,7 @@ export function VideoSettings({ onGenerationStarted }: VideoSettingsProps) {
       {/* Bouton de génération */}
       <Button
         onClick={handleGenerate}
-        disabled={generating || !selectedSourceId || sources.length === 0}
+        disabled={generating || !selectedSourceId}
         className="w-full flex items-center justify-center gap-2"
       >
         {generating ? (
@@ -225,12 +199,6 @@ export function VideoSettings({ onGenerationStarted }: VideoSettingsProps) {
           </>
         )}
       </Button>
-
-      {sources.length === 0 && (
-        <p className="text-sm text-amber-600 dark:text-amber-400 text-center">
-          Uploadez d&apos;abord une image source
-        </p>
-      )}
     </div>
   )
 }
