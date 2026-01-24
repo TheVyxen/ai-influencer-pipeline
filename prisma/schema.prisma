@@ -80,3 +80,36 @@ model Settings {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Images uploadées pour génération vidéo (Veo 3.1)
+model VideoSource {
+  id              String           @id @default(cuid())
+  originalName    String           // Nom du fichier original
+  imageData       String           // Image en base64
+  mimeType        String           // image/jpeg ou image/png
+  createdAt       DateTime         @default(now())
+  generatedVideos GeneratedVideo[] // Vidéos générées à partir de cette image
+}
+
+// Vidéos générées via Veo 3.1 (Vertex AI)
+model GeneratedVideo {
+  id           String      @id @default(cuid())
+  sourceId     String      // Référence à l'image source
+  source       VideoSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  prompt       String?     // Prompt optionnel pour guider la génération
+  aspectRatio  String      @default("9:16") // 9:16 (portrait) ou 16:9 (paysage)
+  duration     Int         @default(5) // Durée en secondes (5, 6, 7, ou 8)
+  resolution   String      @default("1080p") // 720p, 1080p, ou 4k
+
+  // Statut de génération (asynchrone)
+  status       String      @default("pending") // pending | processing | completed | failed
+  operationId  String?     // ID opération Vertex AI pour polling
+  gcsUri       String?     // URI GCS où la vidéo est stockée (gs://bucket/path)
+  errorMessage String?     // Message d'erreur si failed
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([status])
+  @@index([sourceId])
+}
