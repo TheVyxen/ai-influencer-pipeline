@@ -140,8 +140,8 @@ export function VideoUpload({ selectedSourceId, onSelectSource }: VideoUploadPro
           relative border-2 border-dashed rounded-lg p-8
           transition-colors cursor-pointer
           ${isDragging
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-            : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500'
+            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+            : 'border-gray-300 dark:border-gray-600 hover:border-purple-400 dark:hover:border-purple-500'
           }
         `}
       >
@@ -155,7 +155,7 @@ export function VideoUpload({ selectedSourceId, onSelectSource }: VideoUploadPro
         />
 
         <div className="flex flex-col items-center gap-2 text-center">
-          <Upload className={`w-10 h-10 ${isDragging ? 'text-blue-500' : 'text-gray-400'}`} />
+          <Upload className={`w-10 h-10 ${isDragging ? 'text-purple-500' : 'text-gray-400'}`} />
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {uploading ? 'Upload en cours...' : 'Glissez vos images ici ou cliquez pour sélectionner'}
           </p>
@@ -192,7 +192,7 @@ export function VideoUpload({ selectedSourceId, onSelectSource }: VideoUploadPro
               onClick={() => onSelectSource(source.id)}
               className={`relative group aspect-square rounded-lg overflow-hidden border-2 transition-all ${
                 selectedSourceId === source.id
-                  ? 'border-blue-500 ring-2 ring-blue-500/50'
+                  ? 'border-purple-500 ring-2 ring-purple-500/50'
                   : 'border-transparent hover:border-gray-400'
               }`}
             >
@@ -205,7 +205,7 @@ export function VideoUpload({ selectedSourceId, onSelectSource }: VideoUploadPro
 
               {/* Indicateur de sélection */}
               {selectedSourceId === source.id && (
-                <div className="absolute top-1 right-1 bg-blue-500 rounded-full p-0.5">
+                <div className="absolute top-1 right-1 bg-purple-500 rounded-full p-0.5">
                   <Check className="w-3 h-3 text-white" />
                 </div>
               )}

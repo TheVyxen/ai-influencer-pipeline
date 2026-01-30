@@ -1,0 +1,117 @@
+# Docker Compose pour AI Influencer Pipeline
+# Déploiement sur Hetzner avec PostgreSQL local
+
+version: '3.8'
+
+services:
+  # Application Next.js
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: influencer-app
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://influencer:${DB_PASSWORD}@db:5432/influencer_pipeline?schema=public
+      - APIFY_API_KEY=${APIFY_API_KEY}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - WAVESPEED_API_KEY=${WAVESPEED_API_KEY}
+      - NEXT_PUBLIC_APP_URL=${APP_URL}
+      - APP_PASSWORD=${APP_PASSWORD}
+      - APP_SECRET=${APP_SECRET}
+      - CRON_SECRET=${CRON_SECRET}
+      - INSTAGRAM_APP_ID=${INSTAGRAM_APP_ID}
+      - INSTAGRAM_APP_SECRET=${INSTAGRAM_APP_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    volumes:
+      - uploads:/app/public/uploads
+      - generated:/app/public/generated
+      - reference:/app/public/reference
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+    labels:
+      - "traefik.enable=false"
+
+  # Worker pour les jobs en arrière-plan
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: influencer-worker
+    restart: unless-stopped
+    command: ["node", "-r", "tsx/cjs", "lib/agent/worker.ts"]
+    environment:
+      - DATABASE_URL=postgresql://influencer:${DB_PASSWORD}@db:5432/influencer_pipeline?schema=public
+      - APIFY_API_KEY=${APIFY_API_KEY}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - WAVESPEED_API_KEY=${WAVESPEED_API_KEY}
+      - NEXT_PUBLIC_APP_URL=${APP_URL}
+      - INSTAGRAM_APP_ID=${INSTAGRAM_APP_ID}
+      - INSTAGRAM_APP_SECRET=${INSTAGRAM_APP_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    volumes:
+      - uploads:/app/public/uploads
+      - generated:/app/public/generated
+      - reference:/app/public/reference
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # PostgreSQL
+  db:
+    image: postgres:16-alpine
+    container_name: influencer-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=influencer
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=influencer_pipeline
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U influencer -d influencer_pipeline"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # Caddy comme reverse proxy avec HTTPS automatique
+  caddy:
+    image: caddy:2-alpine
+    container_name: influencer-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    networks:
+      - app-network
+
+volumes:
+  postgres-data:
+    driver: local
+  uploads:
+    driver: local
+  generated:
+    driver: local
+  reference:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

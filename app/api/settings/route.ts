@@ -7,7 +7,7 @@ import prisma from '@/lib/prisma'
  */
 export async function GET() {
   try {
-    const settings = await prisma.settings.findMany()
+    const settings = await prisma.appSettings.findMany()
 
     // Convertir en objet clé/valeur
     const settingsMap: Record<string, string> = {}
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     // Mettre à jour chaque paramètre (upsert)
     const updates = Object.entries(body).map(([key, value]) =>
-      prisma.settings.upsert({
+      prisma.appSettings.upsert({
         where: { key },
         update: { value: String(value) },
         create: { key, value: String(value) }

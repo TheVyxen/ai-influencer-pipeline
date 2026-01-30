@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     // Récupérer la clé API depuis les settings
     const keyName = `${api}_api_key`
-    const setting = await prisma.settings.findUnique({
+    const setting = await prisma.appSettings.findUnique({
       where: { key: keyName }
     })
 

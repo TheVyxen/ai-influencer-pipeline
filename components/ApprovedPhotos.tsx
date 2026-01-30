@@ -284,7 +284,7 @@ export function ApprovedPhotos({ initialPhotos }: ApprovedPhotosProps) {
                 {selectedWithoutPrompt > 0 && (
                   <button
                     onClick={handleDescribeSelected}
-                    className="px-2.5 py-1.5 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
+                    className="px-2.5 py-1.5 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-1"
                   >
                     <Search className="w-3.5 h-3.5" />
                     Décrire ({selectedWithoutPrompt})
@@ -343,7 +343,7 @@ export function ApprovedPhotos({ initialPhotos }: ApprovedPhotosProps) {
                       disabled={isBatchProcessing}
                       className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
                         selectedIds.has(photo.id)
-                          ? 'bg-blue-500 border-blue-500 text-white'
+                          ? 'bg-purple-500 border-blue-500 text-white'
                           : 'bg-white/80 border-gray-300 hover:border-blue-400'
                       } disabled:opacity-50`}
                     >
@@ -393,7 +393,7 @@ export function ApprovedPhotos({ initialPhotos }: ApprovedPhotosProps) {
                       <button
                         onClick={() => handleDescribe(photo.id)}
                         disabled={loadingState !== null || isBatchProcessing}
-                        className="w-full py-1.5 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
+                        className="w-full py-1.5 bg-purple-500 text-white text-sm font-medium rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
                       >
                         {isLoading(photo.id, 'describe') ? (
                           <>
@@ -480,7 +480,7 @@ export function ApprovedPhotos({ initialPhotos }: ApprovedPhotosProps) {
               </button>
               <button
                 onClick={() => setSelectedPrompt(null)}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
               >
                 Fermer
               </button>

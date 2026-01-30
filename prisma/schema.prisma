@@ -11,14 +11,77 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// Influenceuse IA - Entité racine multi-tenant
+model Influencer {
+  id                 String   @id @default(cuid())
+  name               String   // Nom d'affichage (ex: "Sofia AI")
+  handle             String   @unique // Handle unique (ex: "@sofia_ai")
+  isActive           Boolean  @default(true) // Influenceuse active ou archivée
+  avatarData         String?  // Avatar en base64
+  referencePhotoData String?  // Photo de référence en base64 (migrée depuis Settings)
+
+  // Config agent (Phase 2+)
+  agentEnabled   Boolean   @default(false)
+  agentInterval  Int       @default(24) // Heures entre les runs
+  lastAgentRun   DateTime?
+
+  // Relations
+  sources          Source[]
+  videoSources     VideoSource[]
+  settings         InfluencerSettings?
+  pipelineRuns     PipelineRun[]
+  scheduledPosts   ScheduledPost[]
+  instagramAccount InstagramAccount?
+  apiUsage         ApiUsage[]
+  alerts           Alert[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Settings spécifiques à chaque influenceuse
+model InfluencerSettings {
+  id           String     @id @default(cuid())
+  influencerId String     @unique
+  influencer   Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  // Génération d'images
+  imageProvider    String @default("gemini") // gemini | wavespeed
+  imageAspectRatio String @default("9:16") // 9:16 | 1:1 | 16:9
+  imageSize        String @default("2K") // 1K | 2K | 4K
+
+  // Scraping
+  postsPerScrape     Int      @default(10)
+  autoScrapeEnabled  Boolean  @default(false)
+  autoScrapeInterval Int      @default(24) // Heures entre scrapes auto
+  lastAutoScrape     DateTime?
+
+  // IA - Captions (Phase 3)
+  captionTone         String  @default("friendly") // friendly | professional | casual | luxury
+  captionLength       String  @default("medium") // short | medium | long
+  captionEmojis       Boolean @default(true)
+  hashtagCount        Int     @default(5)
+  validationThreshold Float   @default(0.7) // Score min pour validation auto
+  postsPerDay         Int     @default(1)
+  timeSlots           String? // JSON array d'heures préférées
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // Comptes Instagram à scraper
 model Source {
-  id        String        @id @default(cuid())
-  username  String        @unique // Nom d'utilisateur Instagram
-  isActive  Boolean       @default(true) // Actif ou non pour le scraping
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  photos    SourcePhoto[] // Photos scrapées depuis ce compte
+  id           String        @id @default(cuid())
+  influencerId String? // Référence à l'influenceuse (nullable pour migration)
+  influencer   Influencer?   @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+  username     String // Nom d'utilisateur Instagram
+  isActive     Boolean       @default(true) // Actif ou non pour le scraping
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  photos       SourcePhoto[] // Photos scrapées depuis ce compte
+
+  @@unique([influencerId, username]) // Un username unique par influenceuse
+  @@index([influencerId])
 }
 
 // Photos scrapées depuis Instagram
@@ -66,16 +129,20 @@ model GeneratedPhoto {
   carouselIndex Int?        // Position dans le carrousel (0, 1, 2...)
   carouselTotal Int?        // Nombre total d'images dans le carrousel
 
+  // Relation vers les posts programmés
+  scheduledPosts ScheduledPost[]
+
   createdAt     DateTime    @default(now())
 
   @@index([sourcePhotoId])
   @@index([carouselId])
 }
 
-// Configuration clé/valeur pour les paramètres de l'application
-model Settings {
+// Configuration globale clé/valeur (clés API uniquement)
+// Les settings par influenceuse sont dans InfluencerSettings
+model AppSettings {
   id        String   @id @default(cuid())
-  key       String   @unique // Clé du paramètre (ex: "apify_api_key")
+  key       String   @unique // Clé du paramètre (ex: "apify_api_key", "google_ai_api_key")
   value     String   // Valeur du paramètre
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -84,11 +151,15 @@ model Settings {
 // Images uploadées pour génération vidéo (Veo 3.1)
 model VideoSource {
   id              String           @id @default(cuid())
+  influencerId    String? // Référence à l'influenceuse (nullable pour migration)
+  influencer      Influencer?      @relation(fields: [influencerId], references: [id], onDelete: Cascade)
   originalName    String           // Nom du fichier original
   imageData       String           // Image en base64
   mimeType        String           // image/jpeg ou image/png
   createdAt       DateTime         @default(now())
   generatedVideos GeneratedVideo[] // Vidéos générées à partir de cette image
+
+  @@index([influencerId])
 }
 
 // Vidéos générées via Veo 3.1 (Vertex AI)
@@ -112,4 +183,188 @@ model GeneratedVideo {
 
   @@index([status])
   @@index([sourceId])
+}
+
+// ============================================
+// PHASE 2 : Infrastructure Agent
+// ============================================
+
+// Exécution d'un pipeline pour une influenceuse
+model PipelineRun {
+  id           String     @id @default(cuid())
+  influencerId String
+  influencer   Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  status      String  @default("pending") // pending | running | completed | failed | cancelled
+  trigger     String // manual | scheduled | cron
+  currentStep String? // scrape | validate | describe | generate | caption | schedule
+
+  // Compteurs de progression
+  photosScraped   Int @default(0)
+  photosValidated Int @default(0)
+  photosGenerated Int @default(0)
+  postsScheduled  Int @default(0)
+
+  // Gestion des erreurs
+  errorMessage String?
+  errorStep    String?
+
+  // Timestamps
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  // Relations
+  steps PipelineStep[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([influencerId])
+  @@index([status])
+}
+
+// Étape individuelle d'un pipeline
+model PipelineStep {
+  id            String      @id @default(cuid())
+  pipelineRunId String
+  pipelineRun   PipelineRun @relation(fields: [pipelineRunId], references: [id], onDelete: Cascade)
+
+  step   String @default("pending") // scrape | validate | describe | generate | caption | schedule
+  status String @default("pending") // pending | running | completed | failed | skipped
+
+  // Données d'entrée/sortie (JSON)
+  input        Json?
+  output       Json?
+  errorMessage String?
+
+  // Timestamps
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  @@index([pipelineRunId])
+}
+
+// File d'attente de jobs (pour le worker background)
+model Job {
+  id          String  @id @default(cuid())
+  type        String // pipeline | scrape | generate | publish
+  status      String  @default("pending") // pending | processing | completed | failed
+  priority    Int     @default(0) // Plus élevé = plus prioritaire
+  data        Json // Données du job (ex: { influencerId, pipelineRunId })
+  attempts    Int     @default(0)
+  maxAttempts Int     @default(3)
+  lastError   String?
+
+  // Planification
+  scheduledFor DateTime?
+
+  // Timestamps
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, scheduledFor])
+  @@index([type, status])
+}
+
+// ============================================
+// PHASE 3 : Intelligence IA
+// ============================================
+
+// Posts programmés pour publication
+model ScheduledPost {
+  id             String     @id @default(cuid())
+  influencerId   String
+  influencer     Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  generatedPhotoId String?
+  generatedPhoto   GeneratedPhoto? @relation(fields: [generatedPhotoId], references: [id], onDelete: SetNull)
+
+  imageData      String    // base64
+  caption        String
+  hashtags       String[]
+  isCarousel     Boolean   @default(false)
+  carouselImages String[]  // base64 images additionnelles
+
+  scheduledFor   DateTime
+  status         String    @default("scheduled") // scheduled | publishing | published | failed
+  publishedAt    DateTime?
+  instagramPostId String?
+  instagramUrl    String?
+  errorMessage    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([influencerId])
+  @@index([scheduledFor])
+  @@index([status])
+}
+
+// ============================================
+// PHASE 4 : Publication Instagram
+// ============================================
+
+// Compte Instagram connecté via OAuth
+model InstagramAccount {
+  id                    String     @id @default(cuid())
+  influencerId          String     @unique
+  influencer            Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  instagramUserId       String     @unique
+  instagramUsername     String
+  instagramAccountType  String     // BUSINESS | CREATOR
+
+  accessToken           String     // Chiffré
+  accessTokenExpiresAt  DateTime
+
+  isConnected           Boolean    @default(true)
+  errorMessage          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// PHASE 5 : Dashboard & Monitoring
+// ============================================
+
+// Suivi des coûts API
+model ApiUsage {
+  id             String      @id @default(cuid())
+  influencerId   String?
+  influencer     Influencer? @relation(fields: [influencerId], references: [id], onDelete: SetNull)
+
+  provider       String   // gemini | wavespeed | apify | instagram
+  operation      String   // describe | generate | scrape | publish
+  estimatedCost  Int      // En centimes USD
+  successful     Boolean  @default(true)
+  errorMessage   String?
+
+  timestamp DateTime @default(now())
+
+  @@index([influencerId])
+  @@index([timestamp])
+  @@index([provider])
+}
+
+// Système d'alertes
+model Alert {
+  id             String      @id @default(cuid())
+  influencerId   String?
+  influencer     Influencer? @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  type           String   // error | warning | info
+  category       String   // pipeline_failed | token_expired | rate_limit | budget_exceeded
+  title          String
+  message        String
+  isRead         Boolean  @default(false)
+  isResolved     Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([influencerId, isRead])
+  @@index([createdAt])
 }

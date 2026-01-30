@@ -64,7 +64,7 @@ export async function GET(
       // Streamer la vidéo depuis GCS
       const videoBuffer = await streamVideoFromGcs(video.gcsUri)
 
-      return new NextResponse(videoBuffer, {
+      return new NextResponse(new Uint8Array(videoBuffer), {
         headers: {
           'Content-Type': 'video/mp4',
           'Content-Length': videoBuffer.length.toString(),

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 
 // Force dynamic pour éviter le cache
@@ -7,12 +7,22 @@ export const dynamic = 'force-dynamic'
 /**
  * GET /api/photos/pending
  * Liste les photos en attente de validation
+ * @param influencerId - Optionnel, filtre par influenceur
  * Triées par date de publication Instagram (plus récent en premier)
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const influencerId = searchParams.get('influencerId')
+
     const photos = await prisma.sourcePhoto.findMany({
-      where: { status: 'pending' },
+      where: {
+        status: 'pending',
+        // Filtrer par influenceur via la relation Source
+        ...(influencerId && {
+          source: { influencerId }
+        })
+      },
       // Trier par date de publication Instagram, fallback sur createdAt
       orderBy: [
         { instagramPublishedAt: { sort: 'desc', nulls: 'last' } },

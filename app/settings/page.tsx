@@ -398,7 +398,7 @@ export default function SettingsPage() {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className="w-full py-2.5 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                className="w-full py-2.5 px-4 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
                 {isUploading ? (
                   <>
@@ -462,7 +462,7 @@ export default function SettingsPage() {
                     value={settings.google_ai_api_key || ''}
                     onChange={(e) => updateSetting('google_ai_api_key', e.target.value)}
                     placeholder="AIza..."
-                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                   <button
                     type="button"
@@ -510,7 +510,7 @@ export default function SettingsPage() {
                     value={settings.wavespeed_api_key || ''}
                     onChange={(e) => updateSetting('wavespeed_api_key', e.target.value)}
                     placeholder="wsk_..."
-                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                   <button
                     type="button"
@@ -553,7 +553,7 @@ export default function SettingsPage() {
                     value={settings.apify_api_key || ''}
                     onChange={(e) => updateSetting('apify_api_key', e.target.value)}
                     placeholder="apify_api_..."
-                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 pr-10 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                   <button
                     type="button"
@@ -599,7 +599,7 @@ export default function SettingsPage() {
                 max="50"
                 value={settings.posts_per_scrape || '10'}
                 onChange={(e) => updateSetting('posts_per_scrape', e.target.value)}
-                className="w-32 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-32 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
             </div>
 
@@ -624,7 +624,7 @@ export default function SettingsPage() {
                   onClick={() => updateSetting('auto_scrape_enabled', settings.auto_scrape_enabled === 'true' ? 'false' : 'true')}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                     settings.auto_scrape_enabled === 'true'
-                      ? 'bg-blue-600'
+                      ? 'bg-purple-600'
                       : 'bg-gray-300 dark:bg-gray-600'
                   }`}
                 >
@@ -646,7 +646,7 @@ export default function SettingsPage() {
                     <select
                       value={settings.auto_scrape_interval || '24'}
                       onChange={(e) => updateSetting('auto_scrape_interval', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     >
                       <option value="3">Toutes les 3 heures</option>
                       <option value="6">Toutes les 6 heures</option>
@@ -756,7 +756,7 @@ export default function SettingsPage() {
                 <select
                   value={settings.image_aspect_ratio || '9:16'}
                   onChange={(e) => updateSetting('image_aspect_ratio', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 >
                   <option value="9:16">9:16 (Portrait - Instagram Stories)</option>
                   <option value="1:1">1:1 (Carré - Instagram Feed)</option>
@@ -775,7 +775,7 @@ export default function SettingsPage() {
                 <select
                   value={settings.image_size || '2K'}
                   onChange={(e) => updateSetting('image_size', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 >
                   <option value="1K">1K (Rapide)</option>
                   <option value="2K">2K (Recommandé)</option>
@@ -815,7 +815,7 @@ export default function SettingsPage() {
             <button
               onClick={handleSaveSettings}
               disabled={isSaving}
-              className="w-full py-2.5 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               {isSaving ? (
                 <>

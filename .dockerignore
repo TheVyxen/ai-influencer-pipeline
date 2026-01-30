@@ -1,0 +1,58 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js
+.next
+out
+
+# Testing
+coverage
+
+# Misc
+.DS_Store
+*.pem
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+CLAUDE.md
+FONCTIONNALITES.md
+*.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Temporary files
+*.log
+*.tmp
+.cache
+
+# Uploads (handled via volumes)
+public/uploads/*
+public/generated/*
+public/reference/*
+!public/uploads/.gitkeep
+!public/generated/.gitkeep
+!public/reference/.gitkeep
+
+# Data folder
+data/

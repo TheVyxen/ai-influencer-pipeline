@@ -23,9 +23,9 @@ export async function GET(request: NextRequest) {
 
     // Récupérer les settings
     const [enabledSetting, intervalSetting, lastScrapeSetting] = await Promise.all([
-      prisma.settings.findUnique({ where: { key: 'auto_scrape_enabled' } }),
-      prisma.settings.findUnique({ where: { key: 'auto_scrape_interval' } }),
-      prisma.settings.findUnique({ where: { key: 'last_auto_scrape' } }),
+      prisma.appSettings.findUnique({ where: { key: 'auto_scrape_enabled' } }),
+      prisma.appSettings.findUnique({ where: { key: 'auto_scrape_interval' } }),
+      prisma.appSettings.findUnique({ where: { key: 'last_auto_scrape' } }),
     ])
 
     // Vérifier si le scrape auto est activé
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     const results = await scrapeAndImportMultipleSources()
 
     // Mettre à jour le timestamp du dernier scrape
-    await prisma.settings.upsert({
+    await prisma.appSettings.upsert({
       where: { key: 'last_auto_scrape' },
       update: { value: new Date().toISOString() },
       create: { key: 'last_auto_scrape', value: new Date().toISOString() },

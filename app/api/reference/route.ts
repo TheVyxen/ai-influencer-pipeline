@@ -8,13 +8,13 @@ import prisma from '@/lib/prisma'
 export async function GET() {
   try {
     // Vérifier si l'image de référence existe dans Settings
-    const setting = await prisma.settings.findUnique({
+    const setting = await prisma.appSettings.findUnique({
       where: { key: 'reference_photo_base64' }
     })
 
     if (setting?.value) {
       // Récupérer le format depuis Settings (optionnel)
-      const formatSetting = await prisma.settings.findUnique({
+      const formatSetting = await prisma.appSettings.findUnique({
         where: { key: 'reference_photo_format' }
       })
 
@@ -84,14 +84,14 @@ export async function POST(request: NextRequest) {
     const base64Data = `data:${mimeType};base64,${buffer.toString('base64')}`
 
     // Sauvegarder dans Settings (upsert)
-    await prisma.settings.upsert({
+    await prisma.appSettings.upsert({
       where: { key: 'reference_photo_base64' },
       update: { value: base64Data },
       create: { key: 'reference_photo_base64', value: base64Data }
     })
 
     // Sauvegarder le format
-    await prisma.settings.upsert({
+    await prisma.appSettings.upsert({
       where: { key: 'reference_photo_format' },
       update: { value: ext },
       create: { key: 'reference_photo_format', value: ext }
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE() {
   try {
     // Supprimer l'image de référence et son format
-    await prisma.settings.deleteMany({
+    await prisma.appSettings.deleteMany({
       where: {
         key: {
           in: ['reference_photo_base64', 'reference_photo_format']

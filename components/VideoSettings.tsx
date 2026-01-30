@@ -17,7 +17,7 @@ interface VideoSettingsProps {
 export function VideoSettings({ selectedSourceId, onGenerationStarted }: VideoSettingsProps) {
   // Paramètres de génération
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('9:16')
-  const [duration, setDuration] = useState<5 | 6 | 7 | 8>(5)
+  const [duration, setDuration] = useState<4 | 6 | 8>(8)
   const [resolution, setResolution] = useState<'720p' | '1080p' | '4k'>('1080p')
   const [prompt, setPrompt] = useState('')
   const [generating, setGenerating] = useState(false)
@@ -83,8 +83,8 @@ export function VideoSettings({ selectedSourceId, onGenerationStarted }: VideoSe
             disabled={generating}
             className={`flex-1 px-3 py-2 rounded-lg border transition-colors flex items-center justify-center gap-2 ${
               aspectRatio === '9:16'
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                ? 'bg-purple-600 text-white border-purple-600'
+                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400'
             }`}
           >
             <Smartphone className="w-5 h-5" />
@@ -95,8 +95,8 @@ export function VideoSettings({ selectedSourceId, onGenerationStarted }: VideoSe
             disabled={generating}
             className={`flex-1 px-3 py-2 rounded-lg border transition-colors flex items-center justify-center gap-2 ${
               aspectRatio === '16:9'
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                ? 'bg-purple-600 text-white border-purple-600'
+                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400'
             }`}
           >
             <Monitor className="w-5 h-5" />
@@ -111,33 +111,31 @@ export function VideoSettings({ selectedSourceId, onGenerationStarted }: VideoSe
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Durée
           </label>
-          <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+          <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">
             {duration}s
           </span>
         </div>
-        <div className="relative h-4 flex items-center">
-          <div className="absolute left-0 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg w-full" />
-          <div
-            className="absolute left-0 h-2 bg-blue-600 rounded-lg transition-all"
-            style={{ width: `${((duration - 5) / 3) * 100}%` }}
-          />
-          <input
-            type="range"
-            min="5"
-            max="8"
-            step="1"
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value) as 5 | 6 | 7 | 8)}
-            disabled={generating}
-            className="absolute w-full h-4 bg-transparent rounded-lg appearance-none cursor-pointer z-10 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-blue-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:bg-blue-600 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-          />
+        <div className="flex gap-2">
+          {([4, 6, 8] as const).map((d) => (
+            <button
+              key={d}
+              onClick={() => setDuration(d)}
+              disabled={generating || (resolution !== '720p' && d !== 8)}
+              className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                duration === d
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400 disabled:opacity-50 disabled:cursor-not-allowed'
+              }`}
+            >
+              {d}s
+            </button>
+          ))}
         </div>
-        <div className="flex justify-between text-xs text-gray-400 mt-1">
-          <span>5s</span>
-          <span>6s</span>
-          <span>7s</span>
-          <span>8s</span>
-        </div>
+        {resolution !== '720p' && (
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+            1080p et 4K nécessitent une durée de 8s
+          </p>
+        )}
       </div>
 
       {/* Qualité */}
@@ -149,12 +147,18 @@ export function VideoSettings({ selectedSourceId, onGenerationStarted }: VideoSe
           {(['720p', '1080p', '4k'] as const).map((r) => (
             <button
               key={r}
-              onClick={() => setResolution(r)}
+              onClick={() => {
+                setResolution(r)
+                // Forcer 8s pour 1080p et 4k
+                if (r !== '720p') {
+                  setDuration(8)
+                }
+              }}
               disabled={generating}
               className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
                 resolution === r
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-blue-400'
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-purple-400'
               }`}
             >
               {r.toUpperCase()}
@@ -174,7 +178,7 @@ export function VideoSettings({ selectedSourceId, onGenerationStarted }: VideoSe
           placeholder="Décrivez le mouvement souhaité..."
           rows={3}
           disabled={generating}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
         />
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
           Ex: &quot;Subtle hair movement in the wind, soft smile&quot;

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 
 // Force dynamic pour éviter le pré-rendu (données trop volumineuses)
@@ -6,11 +6,21 @@ export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/photos/generated
- * Liste toutes les photos générées
+ * Liste les photos générées
+ * @param influencerId - Optionnel, filtre par influenceur
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const influencerId = searchParams.get('influencerId')
+
     const photos = await prisma.generatedPhoto.findMany({
+      where: influencerId ? {
+        // Filtrer par influenceur via la relation imbriquée SourcePhoto -> Source
+        sourcePhoto: {
+          source: { influencerId }
+        }
+      } : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
         sourcePhoto: {

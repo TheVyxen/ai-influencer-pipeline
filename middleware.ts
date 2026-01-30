@@ -10,7 +10,7 @@ import type { NextRequest } from 'next/server'
 const AUTH_COOKIE = 'auth-token'
 
 // Routes publiques (ne nécessitent pas d'authentification)
-const PUBLIC_ROUTES = ['/login', '/api/auth']
+const PUBLIC_ROUTES = ['/login', '/api/auth', '/api/photos/export', '/api/images/generated', '/api/scheduled-posts']
 
 // Extensions de fichiers statiques à ignorer
 const STATIC_EXTENSIONS = ['.ico', '.png', '.jpg', '.jpeg', '.svg', '.css', '.js', '.woff', '.woff2']

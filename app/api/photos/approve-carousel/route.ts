@@ -28,7 +28,7 @@ async function downloadImageFromUrl(url: string): Promise<Buffer> {
  * Retourne le base64 pur (sans le prefixe data:...)
  */
 async function getReferencePhotoBase64(): Promise<string | null> {
-  const setting = await prisma.settings.findUnique({
+  const setting = await prisma.appSettings.findUnique({
     where: { key: 'reference_photo_base64' }
   })
 
@@ -60,9 +60,9 @@ interface GenerationSettings {
 async function getGenerationSettings(): Promise<GenerationSettings> {
   try {
     const [providerSetting, aspectRatioSetting, imageSizeSetting] = await Promise.all([
-      prisma.settings.findUnique({ where: { key: 'image_provider' } }),
-      prisma.settings.findUnique({ where: { key: 'image_aspect_ratio' } }),
-      prisma.settings.findUnique({ where: { key: 'image_size' } }),
+      prisma.appSettings.findUnique({ where: { key: 'image_provider' } }),
+      prisma.appSettings.findUnique({ where: { key: 'image_aspect_ratio' } }),
+      prisma.appSettings.findUnique({ where: { key: 'image_size' } }),
     ])
 
     return {

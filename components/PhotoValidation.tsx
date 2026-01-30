@@ -6,29 +6,21 @@ import toast from 'react-hot-toast'
 import { Clock, Upload, Check, X, CheckSquare, Square, XSquare, Loader2, Layers, ChevronLeft, ChevronRight, ZoomIn, ExternalLink } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
-import { usePendingPhotos, refreshAllData, type PendingPhoto } from '@/lib/hooks/use-photos'
-
-interface Source {
-  id: string
-  username: string
-}
-
-interface PhotoValidationProps {
-  initialPhotos: PendingPhoto[]
-  sources: Source[]
-}
+import { Skeleton } from './ui/Skeleton'
+import { usePendingPhotos, useSources, refreshAllData, type PendingPhoto } from '@/lib/hooks/use-photos'
+import { useInfluencer } from '@/lib/hooks/use-influencer-context'
 
 /**
  * Colonne centrale : Photos à valider avec sélection en lot
- * Utilise SWR pour le rafraîchissement automatique des données
+ * Utilise le contexte influenceur et SWR pour les données
  */
-export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps) {
+export function PhotoValidation() {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { selectedInfluencerId } = useInfluencer()
 
-  // Utiliser SWR pour les photos avec les données initiales comme fallback
-  const { photos: swrPhotos, mutate } = usePendingPhotos()
-  // Utiliser les données SWR si disponibles, sinon les données initiales
-  const photos = swrPhotos.length > 0 || initialPhotos.length === 0 ? swrPhotos : initialPhotos
+  // Utiliser SWR pour les photos et sources
+  const { photos, isLoading: isLoadingPhotos, mutate } = usePendingPhotos(selectedInfluencerId)
+  const { sources } = useSources(selectedInfluencerId)
 
   const [isUploading, setIsUploading] = useState(false)
   const [selectedSourceId, setSelectedSourceId] = useState<string>(sources[0]?.id || '')
@@ -37,7 +29,6 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
   // États pour la sélection en lot
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isProcessing, setIsProcessing] = useState(false)
-  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0)
 
   // État pour suivre les photos en cours de traitement (permet le traitement parallèle)
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
@@ -178,7 +169,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
       }
 
       // Rafraîchir toutes les données via SWR (photos pending, générées, stats)
-      await refreshAllData()
+      await refreshAllData(selectedInfluencerId)
       setSelectedIds(prev => {
         const newSet = new Set(prev)
         newSet.delete(id)
@@ -228,7 +219,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
     if (successCount > 0) {
       toast.success(`${successCount} photo(s) rejetée(s)`)
       // Rafraîchir les données via SWR
-      await refreshAllData()
+      await refreshAllData(selectedInfluencerId)
     }
     if (errorCount > 0) {
       toast.error(`${errorCount} erreur(s) lors du rejet`)
@@ -278,10 +269,10 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
     if (successCount > 0 && errorCount === 0) {
       toast.success(`${successCount} photo(s) traitée(s) avec succès !`, { id: toastId })
       // Rafraîchir toutes les données via SWR
-      await refreshAllData()
+      await refreshAllData(selectedInfluencerId)
     } else if (successCount > 0) {
       toast.success(`${successCount} photo(s) traitée(s), ${errorCount} erreur(s)`, { id: toastId })
-      await refreshAllData()
+      await refreshAllData(selectedInfluencerId)
     } else {
       toast.error(`Échec du traitement (${errorCount} erreur(s))`, { id: toastId })
     }
@@ -322,7 +313,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
       }
 
       // Rafraîchir toutes les données via SWR
-      await refreshAllData()
+      await refreshAllData(selectedInfluencerId)
       // Nettoyer la sélection
       const photoIds = carouselPhotos.map(p => p.id)
       setSelectedIds(prev => {
@@ -352,44 +343,6 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
     setRejectModal({ isOpen: true, photoIds: carouselPhotos.map(p => p.id) })
   }
 
-  // Raccourcis clavier
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Gestion de la modal d'aperçu
-    if (previewModal.isOpen) {
-      if (e.key === 'Escape') {
-        setPreviewModal({ isOpen: false, imageUrl: null, allImages: [], currentIndex: 0 })
-      } else if (e.key === 'ArrowLeft') {
-        navigatePreview('prev')
-      } else if (e.key === 'ArrowRight') {
-        navigatePreview('next')
-      }
-      return
-    }
-
-    if (photos.length === 0) return
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-
-    if (e.key === 'ArrowLeft') {
-      setCurrentPhotoIndex(prev => Math.max(0, prev - 1))
-    } else if (e.key === 'ArrowRight') {
-      setCurrentPhotoIndex(prev => Math.min(photos.length - 1, prev + 1))
-    } else if (e.key === 'a' || e.key === 'A') {
-      if (photos[currentPhotoIndex]) {
-        handleApprove(photos[currentPhotoIndex].id)
-        setCurrentPhotoIndex(prev => Math.min(photos.length - 2, prev))
-      }
-    } else if (e.key === 'r' || e.key === 'R') {
-      if (photos[currentPhotoIndex]) {
-        setRejectModal({ isOpen: true, photoIds: [photos[currentPhotoIndex].id] })
-      }
-    }
-  }, [photos, currentPhotoIndex, previewModal.isOpen, navigatePreview, handleApprove])
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
-
   // Upload manuel
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -412,7 +365,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
       setShowUploadModal(false)
       toast.success('Photo uploadée avec succès')
       // Rafraîchir les données via SWR
-      await refreshAllData()
+      await refreshAllData(selectedInfluencerId)
     } catch (err) {
       toast.error('Erreur lors de l\'upload')
       console.error('Error uploading photo:', err)
@@ -422,6 +375,37 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
         fileInputRef.current.value = ''
       }
     }
+  }
+
+  // Si pas d'influenceur sélectionné
+  if (!selectedInfluencerId) {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+        <EmptyState
+          message="Sélectionnez une influenceuse"
+          icon={<Clock className="w-12 h-12" />}
+        />
+      </div>
+    )
+  }
+
+  // Pendant le chargement
+  if (isLoadingPhotos) {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-500" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Photos à valider</h2>
+          </div>
+        </div>
+        <div className="p-4 space-y-3">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -488,14 +472,11 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
             </div>
           )}
 
-          {/* Aide raccourcis et workflow */}
+          {/* Aide workflow */}
           {photos.length > 0 && (
-            <div className="mt-2 space-y-1">
+            <div className="mt-2">
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Valider = Décrire + Générer automatiquement
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                Raccourcis : ← → naviguer | A approuver | R rejeter
               </p>
             </div>
           )}
@@ -590,7 +571,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                             </div>
 
                             {/* Badge position dans le carrousel */}
-                            <span className="absolute top-1.5 left-1.5 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full z-10 font-medium">
+                            <span className="absolute top-1.5 left-1.5 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full z-10 font-medium">
                               {(photo.carouselIndex || 0) + 1}/{photo.carouselTotal}
                             </span>
 
@@ -603,7 +584,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                               disabled={processingIds.size > 0 || processingCarouselIds.has(carouselId)}
                               className={`absolute top-1.5 right-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all z-10 ${
                                 selectedIds.has(photo.id)
-                                  ? 'bg-blue-500 border-blue-500 text-white'
+                                  ? 'bg-purple-500 border-blue-500 text-white'
                                   : 'bg-white/80 border-gray-300 hover:border-blue-400'
                               } disabled:opacity-50`}
                             >
@@ -661,18 +642,13 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                       key={photo.id}
                       className={`bg-white dark:bg-gray-900 rounded-lg shadow-sm border overflow-hidden transition-all ${
                         selectedIds.has(photo.id)
-                          ? 'border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800'
-                          : index === currentPhotoIndex
-                          ? 'border-purple-400 ring-1 ring-purple-200 dark:ring-purple-800'
+                          ? 'border-purple-500 ring-2 ring-purple-200 dark:ring-purple-800'
                           : 'border-gray-100 dark:border-gray-800 hover:shadow-md'
                       }`}
                     >
                       <div
                         className="aspect-square relative bg-gray-100 dark:bg-gray-800 cursor-pointer group"
-                        onClick={() => {
-                          setCurrentPhotoIndex(index)
-                          openPreview(photo.localPath || photo.originalUrl)
-                        }}
+                        onClick={() => openPreview(photo.localPath || photo.originalUrl)}
                       >
                         {/* Overlay de traitement */}
                         {processingIds.has(photo.id) && (
@@ -697,7 +673,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                             disabled={processingIds.has(photo.id)}
                             className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
                               selectedIds.has(photo.id)
-                                ? 'bg-blue-500 border-blue-500 text-white'
+                                ? 'bg-purple-500 border-blue-500 text-white'
                                 : 'bg-white/80 border-gray-300 hover:border-blue-400'
                             } disabled:opacity-50`}
                           >
@@ -789,7 +765,7 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
                   <select
                     value={selectedSourceId}
                     onChange={(e) => setSelectedSourceId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     {sources.map((source) => (
                       <option key={source.id} value={source.id}>
@@ -900,11 +876,6 @@ export function PhotoValidation({ initialPhotos, sources }: PhotoValidationProps
               {previewModal.currentIndex + 1} / {previewModal.allImages.length}
             </div>
           )}
-
-          {/* Aide clavier */}
-          <div className="absolute bottom-4 right-4 text-white/50 text-xs">
-            Échap pour fermer • ← → pour naviguer
-          </div>
         </div>
       )}
     </>

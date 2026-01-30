@@ -1,0 +1,46 @@
+# Caddyfile pour AI Influencer Pipeline
+# Remplacer {$DOMAIN} par votre domaine (ex: influencer.example.com)
+
+{$DOMAIN} {
+    # Activer la compression
+    encode gzip zstd
+
+    # Headers de sécurité
+    header {
+        # Empêcher le clickjacking
+        X-Frame-Options "SAMEORIGIN"
+        # Protection XSS
+        X-XSS-Protection "1; mode=block"
+        # Empêcher le sniffing MIME
+        X-Content-Type-Options "nosniff"
+        # Politique de référent
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Supprimer le header Server
+        -Server
+    }
+
+    # Logs d'accès
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+
+    # Reverse proxy vers l'application Next.js
+    reverse_proxy app:3000 {
+        # Health check
+        health_uri /api/health
+        health_interval 30s
+        health_timeout 10s
+
+        # Headers pour le proxy
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up Host {host}
+    }
+}
+
+# Redirection HTTP vers HTTPS (automatique avec Caddy)
+# Caddy gère automatiquement les certificats Let's Encrypt

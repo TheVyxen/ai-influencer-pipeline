@@ -133,7 +133,7 @@ export function VideoGallery() {
       case 'pending':
         return <Clock className="w-4 h-4 text-gray-400" />
       case 'processing':
-        return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+        return <Loader2 className="w-4 h-4 text-purple-500 animate-spin" />
       case 'completed':
         return <CheckCircle className="w-4 h-4 text-green-500" />
       case 'failed':
@@ -203,7 +203,7 @@ export function VideoGallery() {
                 ${video.status === 'failed'
                   ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
                   : video.status === 'processing'
-                  ? 'border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20'
+                  ? 'border-purple-300 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20'
                   : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
                 }
               `}
@@ -232,7 +232,7 @@ export function VideoGallery() {
                 {video.status === 'processing' && (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="bg-white dark:bg-gray-800 rounded-lg px-4 py-2 shadow-lg flex items-center gap-2">
-                      <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                      <Loader2 className="w-5 h-5 text-purple-500 animate-spin" />
                       <span className="text-sm font-medium">Génération...</span>
                     </div>
                   </div>
@@ -273,7 +273,7 @@ export function VideoGallery() {
                     <>
                       <button
                         onClick={() => handlePreview(video)}
-                        className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-purple-500 transition-colors"
                         title="Voir"
                       >
                         <Eye className="w-4 h-4" />
@@ -291,7 +291,7 @@ export function VideoGallery() {
                     <button
                       onClick={() => handleRegenerate(video)}
                       disabled={regenerating === video.id}
-                      className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors disabled:opacity-50"
+                      className="p-1.5 text-gray-400 hover:text-purple-500 transition-colors disabled:opacity-50"
                       title="Refaire"
                     >
                       <RefreshCw className={`w-4 h-4 ${regenerating === video.id ? 'animate-spin' : ''}`} />

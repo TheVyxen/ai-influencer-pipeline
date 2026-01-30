@@ -48,7 +48,7 @@ async function getApiKey(): Promise<string | null> {
 
   // Sinon chercher dans les Settings
   try {
-    const setting = await prisma.settings.findUnique({
+    const setting = await prisma.appSettings.findUnique({
       where: { key: 'apify_api_key' }
     })
     return setting?.value || null
@@ -62,7 +62,7 @@ async function getApiKey(): Promise<string | null> {
  */
 export async function getPostsPerScrape(): Promise<number> {
   try {
-    const setting = await prisma.settings.findUnique({
+    const setting = await prisma.appSettings.findUnique({
       where: { key: 'posts_per_scrape' }
     })
     const value = parseInt(setting?.value || '10', 10)
@@ -128,47 +128,34 @@ export async function scrapeInstagramProfile(
     const photos: ApifyPhoto[] = []
 
     for (const item of items) {
-      const postUrl = (item.url as string) || `https://www.instagram.com/p/${item.shortCode}/`
-      const timestamp = (item.timestamp as string) || new Date().toISOString()
-      const caption = item.caption as string | undefined
-      const postId = (item.id as string) || (item.shortCode as string)
+      const itemObj = item as Record<string, unknown>
+      const postUrl = (itemObj.url as string) || `https://www.instagram.com/p/${itemObj.shortCode}/`
+      const timestamp = (itemObj.timestamp as string) || new Date().toISOString()
+      const caption = itemObj.caption as string | undefined
+      const postId = (itemObj.id as string) || (itemObj.shortCode as string)
 
-      // Vérifier si c'est un carrousel (plus d'une image)
-      if (item.images && Array.isArray(item.images) && item.images.length > 1) {
-        // C'est un carrousel - récupérer toutes les images avec leurs métadonnées
-        const validImages = item.images.filter((img: unknown) => img && typeof img === 'string') as string[]
+      // Extraire toutes les URLs d'images avec la fonction améliorée
+      const imageUrls = extractImageUrls(itemObj)
 
-        validImages.forEach((imageUrl: string, index: number) => {
-          photos.push({
-            url: imageUrl,
-            postUrl,
-            timestamp,
-            caption,
-            isCarousel: true,
-            carouselId: postId,
-            carouselIndex: index,
-            carouselTotal: validImages.length,
-          })
-        })
-      } else {
-        // Image unique (pas un carrousel ou carrousel avec une seule image)
-        let imageUrl = item.displayUrl as string | undefined
-
-        // Si pas de displayUrl, essayer de récupérer la première image du tableau
-        if (!imageUrl && Array.isArray(item.images) && item.images.length > 0) {
-          imageUrl = item.images[0] as string
-        }
-
-        if (imageUrl) {
-          photos.push({
-            url: imageUrl,
-            postUrl,
-            timestamp,
-            caption,
-            isCarousel: false,
-          })
-        }
+      if (imageUrls.length === 0) {
+        // Pas d'images (peut-être une vidéo), ignorer
+        continue
       }
+
+      const isCarousel = imageUrls.length > 1
+
+      imageUrls.forEach((imageUrl, index) => {
+        photos.push({
+          url: imageUrl,
+          postUrl,
+          timestamp,
+          caption,
+          isCarousel,
+          carouselId: isCarousel ? postId : undefined,
+          carouselIndex: isCarousel ? index : undefined,
+          carouselTotal: isCarousel ? imageUrls.length : undefined,
+        })
+      })
     }
 
     return photos
@@ -208,6 +195,203 @@ export async function scrapeInstagramProfile(
       `Erreur lors du scraping: ${errorMessage}`,
       'API_ERROR'
     )
+  }
+}
+
+/**
+ * Extrait les URLs d'images depuis différents formats de réponse Apify
+ * Le format peut varier selon le type de post
+ */
+function extractImageUrls(item: Record<string, unknown>): string[] {
+  const urls: string[] = []
+
+  // 1. Vérifier le champ "image" (singulier - format courant)
+  if (typeof item.image === 'string' && item.image.startsWith('http')) {
+    urls.push(item.image)
+  }
+
+  // 2. Vérifier le champ "images" (tableau de strings ou d'objets)
+  if (item.images && Array.isArray(item.images)) {
+    for (const img of item.images) {
+      if (typeof img === 'string' && img.startsWith('http')) {
+        urls.push(img)
+      } else if (img && typeof img === 'object') {
+        // Parfois les images sont des objets avec une propriété url
+        const imgObj = img as Record<string, unknown>
+        if (typeof imgObj.url === 'string') urls.push(imgObj.url)
+        else if (typeof imgObj.src === 'string') urls.push(imgObj.src)
+      }
+    }
+  }
+
+  // 3. Vérifier "displayUrl" (image principale)
+  if (urls.length === 0 && typeof item.displayUrl === 'string') {
+    urls.push(item.displayUrl)
+  }
+
+  // 4. Vérifier "imageUrl" (alternative)
+  if (urls.length === 0 && typeof item.imageUrl === 'string') {
+    urls.push(item.imageUrl)
+  }
+
+  // 5. Vérifier "thumbnailUrl" (fallback)
+  if (urls.length === 0 && typeof item.thumbnailUrl === 'string') {
+    urls.push(item.thumbnailUrl)
+  }
+
+  // 6. Vérifier "sidecarImages" (pour les carrousels)
+  if (item.sidecarImages && Array.isArray(item.sidecarImages)) {
+    for (const img of item.sidecarImages) {
+      if (typeof img === 'string' && img.startsWith('http')) {
+        urls.push(img)
+      } else if (img && typeof img === 'object') {
+        const imgObj = img as Record<string, unknown>
+        if (typeof imgObj.url === 'string') urls.push(imgObj.url)
+        else if (typeof imgObj.src === 'string') urls.push(imgObj.src)
+        else if (typeof imgObj.displayUrl === 'string') urls.push(imgObj.displayUrl)
+      }
+    }
+  }
+
+  // 7. Vérifier "childPosts" (autre format de carrousel)
+  if (item.childPosts && Array.isArray(item.childPosts)) {
+    for (const child of item.childPosts) {
+      if (child && typeof child === 'object') {
+        const childObj = child as Record<string, unknown>
+        if (typeof childObj.displayUrl === 'string') urls.push(childObj.displayUrl)
+        else if (typeof childObj.imageUrl === 'string') urls.push(childObj.imageUrl)
+        else if (typeof childObj.image === 'string') urls.push(childObj.image)
+      }
+    }
+  }
+
+  // Dédupliquer et filtrer les URLs valides
+  return Array.from(new Set(urls)).filter(url => url && url.startsWith('http'))
+}
+
+/**
+ * Scrape un post Instagram spécifique par URL
+ * @param postUrl - URL du post Instagram (ex: https://www.instagram.com/p/ABC123/)
+ * @returns Liste des photos du post (peut être un carrousel)
+ */
+export async function scrapeInstagramPost(postUrl: string): Promise<ApifyPhoto[]> {
+  const apiKey = await getApiKey()
+
+  if (!apiKey) {
+    throw new ApifyError(
+      'Configurez votre clé Apify dans Settings',
+      'NOT_CONFIGURED'
+    )
+  }
+
+  // Valider et nettoyer l'URL
+  let cleanUrl = postUrl.trim()
+
+  // Vérifier que c'est une URL Instagram valide
+  const instagramPostRegex = /^https?:\/\/(www\.)?instagram\.com\/(p|reel)\/[\w-]+\/?/
+  if (!instagramPostRegex.test(cleanUrl)) {
+    throw new ApifyError(
+      'URL Instagram invalide. Format attendu: https://www.instagram.com/p/ABC123/',
+      'NOT_FOUND'
+    )
+  }
+
+  try {
+    const client = new ApifyClient({ token: apiKey })
+
+    // Lancer l'actor Instagram Scraper avec l'URL du post
+    const run = await client.actor('apify/instagram-scraper').call({
+      directUrls: [cleanUrl],
+      resultsType: 'posts',
+      resultsLimit: 1,
+    })
+
+    // Récupérer les résultats
+    const { items } = await client.dataset(run.defaultDatasetId).listItems()
+
+    if (!items || items.length === 0) {
+      throw new ApifyError(
+        'Post non trouvé ou inaccessible',
+        'NOT_FOUND'
+      )
+    }
+
+    // Transformer les résultats en format ApifyPhoto
+    const photos: ApifyPhoto[] = []
+    const item = items[0] as Record<string, unknown>
+
+    // Log pour debug
+    console.log('Apify response keys:', Object.keys(item))
+    console.log('Item type:', item.type)
+    console.log('Has image (singular):', !!item.image, typeof item.image === 'string' ? item.image.substring(0, 50) + '...' : '')
+    console.log('Has images:', !!item.images, Array.isArray(item.images) ? (item.images as unknown[]).length : 0)
+    console.log('Has displayUrl:', !!item.displayUrl)
+    console.log('Has sidecarImages:', !!item.sidecarImages)
+    console.log('Has childPosts:', !!item.childPosts)
+    console.log('Error fields:', item.error, item.errorDescription)
+
+    const finalPostUrl = (item.url as string) || cleanUrl
+    const timestamp = (item.timestamp as string) || new Date().toISOString()
+    const caption = item.caption as string | undefined
+    const postId = (item.id as string) || (item.shortCode as string)
+
+    // Extraire toutes les URLs d'images
+    const imageUrls = extractImageUrls(item)
+
+    console.log('Extracted image URLs:', imageUrls.length)
+
+    if (imageUrls.length === 0) {
+      // Vérifier si c'est une vidéo/reel
+      if (item.type === 'Video' || item.videoUrl || item.isVideo) {
+        throw new ApifyError(
+          'Ce post est une vidéo/reel, pas une image',
+          'NOT_FOUND'
+        )
+      }
+      return []
+    }
+
+    // Créer les ApifyPhoto
+    const isCarousel = imageUrls.length > 1
+
+    imageUrls.forEach((imageUrl, index) => {
+      photos.push({
+        url: imageUrl,
+        postUrl: finalPostUrl,
+        timestamp,
+        caption,
+        isCarousel,
+        carouselId: isCarousel ? postId : undefined,
+        carouselIndex: isCarousel ? index : undefined,
+        carouselTotal: isCarousel ? imageUrls.length : undefined,
+      })
+    })
+
+    return photos
+  } catch (error) {
+    if (error instanceof ApifyError) {
+      throw error
+    }
+
+    const errorMessage = error instanceof Error ? error.message : String(error)
+
+    if (errorMessage.includes('private') || errorMessage.includes('Private')) {
+      throw new ApifyError('Ce post provient d\'un compte privé', 'PRIVATE_ACCOUNT')
+    }
+
+    if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+      throw new ApifyError('Post non trouvé', 'NOT_FOUND')
+    }
+
+    if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+      throw new ApifyError('Limite Apify atteinte, réessayez plus tard', 'RATE_LIMIT')
+    }
+
+    if (errorMessage.includes('Invalid API token') || errorMessage.includes('401')) {
+      throw new ApifyError('Clé API Apify invalide', 'NOT_CONFIGURED')
+    }
+
+    throw new ApifyError(`Erreur lors du scraping: ${errorMessage}`, 'API_ERROR')
   }
 }
 

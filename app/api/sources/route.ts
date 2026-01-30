@@ -3,11 +3,16 @@ import prisma from '@/lib/prisma'
 
 /**
  * GET /api/sources
- * Liste toutes les sources Instagram
+ * Liste les sources Instagram
+ * @param influencerId - Optionnel, filtre par influenceur
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const influencerId = searchParams.get('influencerId')
+
     const sources = await prisma.source.findMany({
+      where: influencerId ? { influencerId } : undefined,
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
@@ -29,11 +34,20 @@ export async function GET() {
 /**
  * POST /api/sources
  * Ajouter une nouvelle source Instagram
+ * @param influencerId - Requis, l'influenceur propriétaire de la source
+ * @param username - Requis, le nom d'utilisateur Instagram
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { username } = body
+    const { username, influencerId } = body
+
+    if (!influencerId || typeof influencerId !== 'string') {
+      return NextResponse.json(
+        { error: 'influencerId is required' },
+        { status: 400 }
+      )
+    }
 
     if (!username || typeof username !== 'string') {
       return NextResponse.json(
@@ -52,20 +66,26 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Vérifier si la source existe déjà
-    const existing = await prisma.source.findUnique({
-      where: { username: cleanUsername }
+    // Vérifier si la source existe déjà pour cet influenceur
+    const existing = await prisma.source.findFirst({
+      where: {
+        influencerId,
+        username: cleanUsername
+      }
     })
 
     if (existing) {
       return NextResponse.json(
-        { error: 'Source already exists' },
+        { error: 'Source already exists for this influencer' },
         { status: 409 }
       )
     }
 
     const source = await prisma.source.create({
-      data: { username: cleanUsername }
+      data: {
+        username: cleanUsername,
+        influencerId
+      }
     })
 
     return NextResponse.json(source, { status: 201 })

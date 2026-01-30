@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { ToastProvider } from '@/components/ui/Toast'
 import { ThemeProvider } from '@/components/ThemeProvider'
+import { InfluencerProvider } from '@/lib/hooks/use-influencer-context'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -42,7 +43,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background antialiased">
         <ThemeProvider>
-          {children}
+          <InfluencerProvider>
+            {children}
+          </InfluencerProvider>
           <ToastProvider />
         </ThemeProvider>
       </body>

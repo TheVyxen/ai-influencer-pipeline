@@ -2,25 +2,22 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import toast from 'react-hot-toast'
-import { Sparkles, Download, Copy, X, Check, Trash2, FileText, Layers, ChevronLeft, ChevronRight, ZoomIn, CheckSquare, Square } from 'lucide-react'
+import { Sparkles, Download, Copy, X, Check, Trash2, FileText, Layers, ChevronLeft, ChevronRight, ZoomIn, CheckSquare, Square, Send } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
+import { Skeleton } from './ui/Skeleton'
 import { useGeneratedPhotos, refreshGeneratedPhotos, type GeneratedPhoto } from '@/lib/hooks/use-photos'
-
-interface GeneratedGalleryProps {
-  photos: GeneratedPhoto[]
-}
+import { useInfluencer } from '@/lib/hooks/use-influencer-context'
 
 /**
  * Section des photos generees via Gemini 3
  * Supporte l'affichage groupe des carrousels
- * Utilise SWR pour le rafraîchissement automatique
+ * Utilise le contexte influenceur et SWR
  */
-export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProps) {
-  // Utiliser SWR pour les photos avec les données initiales comme fallback
-  const { photos: swrPhotos } = useGeneratedPhotos()
-  // Utiliser les données SWR si disponibles, sinon les données initiales
-  const photos = swrPhotos.length > 0 || initialPhotos.length === 0 ? swrPhotos : initialPhotos
+export function GeneratedGallery() {
+  const { selectedInfluencerId } = useInfluencer()
+  // Utiliser SWR pour les photos avec le contexte influenceur
+  const { photos, isLoading: isLoadingPhotos } = useGeneratedPhotos(selectedInfluencerId)
   const [selectedPrompt, setSelectedPrompt] = useState<{ id: string; prompt: string } | null>(null)
   const [selectedImage, setSelectedImage] = useState<{
     id: string
@@ -33,6 +30,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isDownloadingZip, setIsDownloadingZip] = useState(false)
   const [downloadingCarouselId, setDownloadingCarouselId] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   // Etat pour la modal de confirmation de suppression
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; photoIds: string[] }>({
@@ -179,7 +177,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
     if (successCount > 0) {
       toast.success(`${successCount} photo(s) supprimee(s)`)
       // Rafraîchir les données via SWR
-      await refreshGeneratedPhotos()
+      await refreshGeneratedPhotos(selectedInfluencerId)
     }
     if (errorCount > 0) {
       toast.error(`${errorCount} erreur(s) lors de la suppression`)
@@ -193,6 +191,38 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
   const handleCopyPrompt = (prompt: string) => {
     navigator.clipboard.writeText(prompt)
     toast.success('Prompt copie')
+  }
+
+  // Exporter vers ready-to-post pour Clawdbot
+  const handleExportForPosting = async (ids?: string[]) => {
+    const idsToExport = ids || Array.from(selectedIds)
+    if (idsToExport.length === 0) return
+
+    setIsExporting(true)
+    const toastId = toast.loading(`Export vers Clawdbot (${idsToExport.length} photos)...`)
+
+    try {
+      const response = await fetch('/api/photos/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photoIds: idsToExport })
+      })
+
+      if (!response.ok) throw new Error('Export failed')
+
+      const result = await response.json()
+      toast.success(`✅ ${result.exported} photo(s) exportée(s) vers Clawdbot`, { id: toastId })
+      
+      // Désélectionner les photos exportées
+      if (!ids) {
+        setSelectedIds(new Set())
+      }
+    } catch (err) {
+      toast.error('Erreur lors de l\'export vers Clawdbot', { id: toastId })
+      console.error('Error exporting photos:', err)
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   // Ouvrir l'aperçu avec navigation pour les carrousels
@@ -254,6 +284,37 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [selectedImage, navigatePreview])
 
+  // Si pas d'influenceur sélectionné
+  if (!selectedInfluencerId) {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 h-fit p-6">
+        <EmptyState
+          message="Sélectionnez une influenceuse"
+          icon={<Sparkles className="w-12 h-12" />}
+        />
+      </div>
+    )
+  }
+
+  // Pendant le chargement
+  if (isLoadingPhotos) {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 h-fit">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-purple-600" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Photos générées</h2>
+          </div>
+        </div>
+        <div className="p-4 space-y-3">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
       <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 h-fit">
@@ -294,6 +355,27 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
               {selectedIds.size > 0 && (
                 <>
                   <button
+                    onClick={() => handleExportForPosting()}
+                    disabled={isExporting}
+                    className="px-2.5 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    {isExporting ? (
+                      <>
+                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Export...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        Clawdbot ({selectedIds.size})
+                      </>
+                    )}
+                  </button>
+
+                  <button
                     onClick={() => handleDownloadZip()}
                     disabled={isDownloadingZip}
                     className="px-2.5 py-1.5 text-xs font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
@@ -326,14 +408,11 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
             </div>
           )}
 
-          {/* Aide raccourcis */}
+          {/* Aide */}
           {photos.length > 0 && (
-            <div className="mt-2 space-y-1">
+            <div className="mt-2">
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 Cliquer sur une image pour l&apos;agrandir
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                Raccourcis : ← → naviguer | Échap fermer
               </p>
             </div>
           )}
@@ -360,6 +439,21 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                       Carrousel ({carouselPhotos.length} photos)
                     </span>
                     <div className="ml-auto flex gap-2">
+                      <button
+                        onClick={() => handleExportForPosting(carouselPhotos.map(p => p.id))}
+                        disabled={isExporting}
+                        className="px-3 py-1.5 text-xs font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                      >
+                        {isExporting ? (
+                          <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        ) : (
+                          <Send className="w-3 h-3" />
+                        )}
+                        Clawdbot
+                      </button>
                       <button
                         onClick={() => handleDownloadZip(carouselPhotos.map(p => p.id))}
                         disabled={downloadingCarouselId === carouselId}
@@ -410,7 +504,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                             }}
                             className={`absolute top-1.5 right-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all z-10 ${
                               selectedIds.has(photo.id)
-                                ? 'bg-blue-500 border-blue-500 text-white'
+                                ? 'bg-purple-500 border-blue-500 text-white'
                                 : 'bg-white/80 border-gray-300 hover:border-blue-400'
                             }`}
                           >
@@ -438,7 +532,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                           </button>
                           <button
                             onClick={() => handleDownload(photo)}
-                            className="flex-1 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors flex items-center justify-center"
+                            className="flex-1 py-1.5 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 transition-colors flex items-center justify-center"
                             title="Telecharger"
                           >
                             <Download className="w-3 h-3" />
@@ -484,7 +578,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                             }}
                             className={`absolute top-1.5 right-1.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all z-10 ${
                               selectedIds.has(photo.id)
-                                ? 'bg-blue-500 border-blue-500 text-white'
+                                ? 'bg-purple-500 border-blue-500 text-white'
                                 : 'bg-white/80 border-gray-300 hover:border-blue-400'
                             }`}
                           >
@@ -512,7 +606,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                           </button>
                           <button
                             onClick={() => handleDownload(photo)}
-                            className="flex-1 py-1.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 transition-colors flex items-center justify-center"
+                            className="flex-1 py-1.5 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 transition-colors flex items-center justify-center"
                             title="Telecharger"
                           >
                             <Download className="w-3 h-3" />
@@ -603,16 +697,11 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
                 const photo = photos.find(p => p.id === selectedImage.id)
                 if (photo) handleDownload(photo)
               }}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
             >
               <Download className="w-4 h-4" />
               Telecharger
             </button>
-          </div>
-
-          {/* Aide clavier */}
-          <div className="absolute bottom-4 right-4 text-white/50 text-xs">
-            Échap pour fermer • ← → pour naviguer
           </div>
         </div>
       )}
@@ -645,7 +734,7 @@ export function GeneratedGallery({ photos: initialPhotos }: GeneratedGalleryProp
               </button>
               <button
                 onClick={() => setSelectedPrompt(null)}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 transition-colors"
               >
                 Fermer
               </button>

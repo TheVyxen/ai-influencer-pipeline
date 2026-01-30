@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Mode standalone pour Docker
+  output: 'standalone',
+
   // Configuration pour les images externes (Instagram, etc.)
   images: {
     remotePatterns: [

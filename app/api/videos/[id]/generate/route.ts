@@ -25,9 +25,9 @@ export async function POST(
       )
     }
 
-    if (!duration || ![5, 6, 7, 8].includes(duration)) {
+    if (!duration || ![4, 6, 8].includes(duration)) {
       return NextResponse.json(
-        { error: 'Durée invalide. Choisissez 5, 6, 7 ou 8 secondes.' },
+        { error: 'Durée invalide. Choisissez 4, 6 ou 8 secondes.' },
         { status: 400 }
       )
     }
@@ -36,6 +36,14 @@ export async function POST(
     if (resolution && !validResolutions.includes(resolution)) {
       return NextResponse.json(
         { error: 'Résolution invalide. Choisissez 720p, 1080p ou 4k.' },
+        { status: 400 }
+      )
+    }
+
+    // 1080p et 4k nécessitent une durée de 8 secondes
+    if ((resolution === '1080p' || resolution === '4k') && duration !== 8) {
+      return NextResponse.json(
+        { error: '1080p et 4K nécessitent une durée de 8 secondes.' },
         { status: 400 }
       )
     }
@@ -81,7 +89,7 @@ export async function POST(
         {
           prompt: prompt,
           aspectRatio: aspectRatio as '9:16' | '16:9',
-          duration: duration as 5 | 6 | 7 | 8,
+          duration: duration as 4 | 6 | 8,
           resolution: (resolution || '1080p') as '720p' | '1080p' | '4k',
         }
       )

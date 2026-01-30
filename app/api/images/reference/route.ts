@@ -9,7 +9,7 @@ import prisma from '@/lib/prisma'
 export async function GET() {
   try {
     // Récupérer l'image de référence depuis Settings
-    const setting = await prisma.settings.findUnique({
+    const setting = await prisma.appSettings.findUnique({
       where: { key: 'reference_photo_base64' }
     })
 

@@ -2,34 +2,24 @@
 
 import { Users, Clock, Activity, Sparkles } from 'lucide-react'
 import { useStats } from '@/lib/hooks/use-photos'
-
-interface StatsBarProps {
-  sourcesCount: number
-  pendingCount: number
-  generatedCount: number
-  lastActivity: string | null
-}
+import { useInfluencer } from '@/lib/hooks/use-influencer-context'
+import { Skeleton } from './ui/Skeleton'
 
 /**
  * Barre de statistiques en haut du dashboard
  * Workflow simplifié : Sources → En attente → Générées
- * Utilise SWR pour le rafraîchissement automatique
+ * Utilise le contexte influenceur et SWR pour les données
  */
-export function StatsBar({
-  sourcesCount: initialSourcesCount,
-  pendingCount: initialPendingCount,
-  generatedCount: initialGeneratedCount,
-  lastActivity: initialLastActivity,
-}: StatsBarProps) {
-  // Utiliser SWR pour les stats avec les données initiales comme fallback
-  const { stats: swrStats } = useStats()
+export function StatsBar() {
+  const { selectedInfluencerId } = useInfluencer()
+  const { stats, isLoading } = useStats(selectedInfluencerId)
 
-  // Utiliser les données SWR si disponibles, sinon les données initiales
-  const sourcesCount = swrStats?.sourcesCount ?? initialSourcesCount
-  const pendingCount = swrStats?.pendingCount ?? initialPendingCount
-  const generatedCount = swrStats?.generatedCount ?? initialGeneratedCount
-  const lastActivity = swrStats?.lastActivity ?? initialLastActivity
-  const stats = [
+  // Valeurs par défaut si pas encore chargé
+  const sourcesCount = stats?.sourcesCount ?? 0
+  const pendingCount = stats?.pendingCount ?? 0
+  const generatedCount = stats?.generatedCount ?? 0
+  const lastActivity = stats?.lastActivity ?? null
+  const statsItems = [
     {
       label: 'Sources',
       value: sourcesCount,
@@ -72,9 +62,31 @@ export function StatsBar({
     }).format(d)
   }
 
+  // Pendant le chargement ou sans influenceur
+  if (!selectedInfluencerId || isLoading) {
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
+            className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-9 h-9 rounded-lg" />
+              <div className="flex-1">
+                <Skeleton className="h-3 w-16 mb-2" />
+                <Skeleton className="h-6 w-10" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {stats.map((stat) => {
+      {statsItems.map((stat) => {
         const Icon = stat.icon
         return (
           <div

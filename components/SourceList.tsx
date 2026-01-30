@@ -2,20 +2,12 @@
 
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Plus, RefreshCw, Trash2, Users } from 'lucide-react'
+import { Plus, RefreshCw, Trash2, Users, Link as LinkIcon, Loader2 } from 'lucide-react'
 import { EmptyState } from './ui/EmptyState'
 import { ConfirmModal } from './ui/ConfirmModal'
-import { refreshAllData } from '@/lib/hooks/use-photos'
-
-interface Source {
-  id: string
-  username: string
-  isActive: boolean
-  createdAt: string
-  _count: {
-    photos: number
-  }
-}
+import { useSources, refreshAllData, Source } from '@/lib/hooks/use-photos'
+import { useInfluencer } from '@/lib/hooks/use-influencer-context'
+import { Skeleton } from './ui/Skeleton'
 
 interface ScrapeResult {
   sourceId: string
@@ -26,16 +18,14 @@ interface ScrapeResult {
   error?: string
 }
 
-interface SourceListProps {
-  initialSources: Source[]
-}
-
 /**
  * Colonne gauche : Liste des sources Instagram
- * Utilise SWR pour rafraîchir les données après scraping
+ * Utilise le contexte influenceur pour filtrer les sources
  */
-export function SourceList({ initialSources }: SourceListProps) {
-  const [sources, setSources] = useState<Source[]>(initialSources)
+export function SourceList() {
+  const { selectedInfluencerId } = useInfluencer()
+  const { sources, isLoading: isLoadingSources, mutate: mutateSources } = useSources(selectedInfluencerId)
+
   const [username, setUsername] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
@@ -49,10 +39,14 @@ export function SourceList({ initialSources }: SourceListProps) {
     source: null,
   })
 
+  // État pour l'import de post
+  const [postUrl, setPostUrl] = useState('')
+  const [isImporting, setIsImporting] = useState(false)
+
   // Ajouter une nouvelle source
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username.trim() || isLoading) return
+    if (!username.trim() || isLoading || !selectedInfluencerId) return
 
     setIsLoading(true)
 
@@ -60,7 +54,10 @@ export function SourceList({ initialSources }: SourceListProps) {
       const res = await fetch('/api/sources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim() })
+        body: JSON.stringify({
+          username: username.trim(),
+          influencerId: selectedInfluencerId
+        })
       })
 
       if (!res.ok) {
@@ -69,11 +66,11 @@ export function SourceList({ initialSources }: SourceListProps) {
       }
 
       const newSource = await res.json()
-      setSources(prev => [{ ...newSource, _count: { photos: 0 } }, ...prev])
       setUsername('')
       toast.success(`@${newSource.username} ajouté avec succès`)
-      // Rafraîchir les stats via SWR
-      await refreshAllData()
+      // Rafraîchir les sources et stats via SWR
+      await mutateSources()
+      await refreshAllData(selectedInfluencerId)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Une erreur est survenue')
     } finally {
@@ -94,10 +91,10 @@ export function SourceList({ initialSources }: SourceListProps) {
         throw new Error('Failed to delete source')
       }
 
-      setSources(prev => prev.filter(s => s.id !== deleteModal.source!.id))
       toast.success(`@${deleteModal.source.username} supprimé`)
       // Rafraîchir les données via SWR (les photos associées sont supprimées)
-      await refreshAllData()
+      await mutateSources()
+      await refreshAllData(selectedInfluencerId)
     } catch (err) {
       toast.error('Erreur lors de la suppression')
       console.error('Error deleting source:', err)
@@ -107,12 +104,12 @@ export function SourceList({ initialSources }: SourceListProps) {
   }
 
   // Scraper une source individuelle
-  const handleScrapeOne = async (id: string, username: string) => {
+  const handleScrapeOne = async (id: string, sourceUsername: string) => {
     if (isScraping) return
 
     setScrapingSourceId(id)
     setIsScraping(true)
-    const toastId = toast.loading(`Scraping @${username}...`)
+    const toastId = toast.loading(`Scraping @${sourceUsername}...`)
 
     try {
       const res = await fetch(`/api/scrape/${id}`, {
@@ -127,14 +124,10 @@ export function SourceList({ initialSources }: SourceListProps) {
 
       const result = data.result as ScrapeResult
       if (result.photosImported > 0) {
-        toast.success(`${result.photosImported} photo(s) importée(s) depuis @${username}`, { id: toastId })
-        setSources(prev => prev.map(s =>
-          s.id === id
-            ? { ...s, _count: { photos: s._count.photos + result.photosImported } }
-            : s
-        ))
-        // Rafraîchir les photos pending via SWR
-        await refreshAllData()
+        toast.success(`${result.photosImported} photo(s) importée(s) depuis @${sourceUsername}`, { id: toastId })
+        // Rafraîchir les sources et photos via SWR
+        await mutateSources()
+        await refreshAllData(selectedInfluencerId)
       } else if (result.photosSkipped > 0) {
         toast.success(`Aucune nouvelle photo (${result.photosSkipped} doublon(s))`, { id: toastId })
       } else {
@@ -150,7 +143,7 @@ export function SourceList({ initialSources }: SourceListProps) {
 
   // Scraper toutes les sources
   const handleScrapeAll = async () => {
-    if (isScraping || sources.length === 0) return
+    if (isScraping || sources.length === 0 || !selectedInfluencerId) return
 
     setIsScraping(true)
     const toastId = toast.loading('Scraping de toutes les sources...')
@@ -159,7 +152,7 @@ export function SourceList({ initialSources }: SourceListProps) {
       const res = await fetch('/api/scrape', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
+        body: JSON.stringify({ influencerId: selectedInfluencerId })
       })
 
       const data = await res.json()
@@ -178,8 +171,9 @@ export function SourceList({ initialSources }: SourceListProps) {
       let message = ''
       if (totals.photosImported > 0) {
         message = `${totals.photosImported} photo(s) importée(s) au total`
-        // Rafraîchir les photos pending via SWR
-        await refreshAllData()
+        // Rafraîchir les sources et photos via SWR
+        await mutateSources()
+        await refreshAllData(selectedInfluencerId)
       } else if (totals.photosSkipped > 0) {
         message = `Aucune nouvelle photo (${totals.photosSkipped} doublon(s))`
       } else {
@@ -196,6 +190,81 @@ export function SourceList({ initialSources }: SourceListProps) {
     } finally {
       setIsScraping(false)
     }
+  }
+
+  // Importer un post Instagram par URL
+  const handleImportPost = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!postUrl.trim() || isImporting || !selectedInfluencerId) return
+
+    setIsImporting(true)
+    const toastId = toast.loading('Import en cours...')
+
+    try {
+      const response = await fetch('/api/scrape/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: postUrl.trim(),
+          influencerId: selectedInfluencerId
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erreur lors de l\'import')
+      }
+
+      if (data.photosImported > 0) {
+        toast.success(
+          `${data.photosImported} photo(s) importée(s)${data.photosSkipped > 0 ? ` (${data.photosSkipped} doublon(s))` : ''}`,
+          { id: toastId }
+        )
+        setPostUrl('')
+        await mutateSources()
+        await refreshAllData(selectedInfluencerId)
+      } else if (data.photosSkipped > 0) {
+        toast.error('Photos déjà importées', { id: toastId })
+      } else {
+        toast.error('Aucune photo trouvée', { id: toastId })
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erreur lors de l\'import', { id: toastId })
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  // Si pas d'influenceur sélectionné, afficher un message
+  if (!selectedInfluencerId) {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 h-fit p-6">
+        <EmptyState
+          message="Sélectionnez une influenceuse"
+          icon={<Users className="w-12 h-12" />}
+        />
+      </div>
+    )
+  }
+
+  // Pendant le chargement
+  if (isLoadingSources) {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 h-fit">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Sources Instagram</h2>
+          </div>
+        </div>
+        <div className="p-4 space-y-2">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -277,16 +346,48 @@ export function SourceList({ initialSources }: SourceListProps) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="@username"
-                className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 disabled={isLoading}
               />
               <button
                 type="submit"
                 disabled={isLoading || !username.trim()}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
               >
                 <Plus className="w-4 h-4" />
                 {isLoading ? '...' : 'Ajouter'}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Section Import de post */}
+        <div className="p-4 border-t border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2 mb-3">
+            <LinkIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Importer un post</h2>
+          </div>
+          <form onSubmit={handleImportPost}>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={postUrl}
+                onChange={(e) => setPostUrl(e.target.value)}
+                placeholder="https://www.instagram.com/p/..."
+                className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                disabled={isImporting}
+              />
+              <button
+                type="submit"
+                disabled={isImporting || !postUrl.trim()}
+                className="px-4 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+              >
+                {isImporting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                {isImporting ? '...' : 'Importer'}
               </button>
             </div>
           </form>

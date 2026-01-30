@@ -19,7 +19,7 @@ async function getApiKey(): Promise<string | null> {
 
   // Sinon chercher dans les Settings
   try {
-    const setting = await prisma.settings.findUnique({
+    const setting = await prisma.appSettings.findUnique({
       where: { key: 'google_ai_api_key' }
     })
     return setting?.value || null
