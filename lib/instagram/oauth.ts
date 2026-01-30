@@ -67,7 +67,7 @@ export function getAuthorizationUrl(influencerId: string): string {
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
-    scope: 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement',
+    scope: 'instagram_business_basic,instagram_business_content_publish,instagram_business_manage_messages',
     response_type: 'code',
     state
   })
