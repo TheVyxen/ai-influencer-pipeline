@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     const { accessToken, userId } = await exchangeCodeForToken(code)
 
     // Récupérer les infos du compte Instagram
-    const accountInfo = await getAccountInfo(accessToken)
+    const accountInfo = await getAccountInfo(accessToken, userId)
 
     // Sauvegarder en base de données
     await saveInstagramAccount(

@@ -53,7 +53,8 @@ export function decrypt(encrypted: string): string {
 }
 
 /**
- * Génère l'URL d'autorisation OAuth Instagram
+ * Génère l'URL d'autorisation OAuth via Facebook Login
+ * (nécessaire pour instagram_content_publish)
  */
 export function getAuthorizationUrl(influencerId: string): string {
   if (!CLIENT_ID) {
@@ -62,19 +63,20 @@ export function getAuthorizationUrl(influencerId: string): string {
 
   const state = Buffer.from(JSON.stringify({ influencerId })).toString('base64')
 
+  // Utiliser Facebook OAuth pour les permissions Instagram Business
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: REDIRECT_URI,
-    scope: 'instagram_basic,instagram_content_publish,instagram_manage_insights',
+    scope: 'instagram_basic,instagram_content_publish,pages_show_list,pages_read_engagement',
     response_type: 'code',
     state
   })
 
-  return `https://api.instagram.com/oauth/authorize?${params}`
+  return `https://www.facebook.com/v21.0/dialog/oauth?${params}`
 }
 
 /**
- * Échange le code d'autorisation contre un access token
+ * Échange le code d'autorisation contre un access token via Facebook Graph API
  */
 export async function exchangeCodeForToken(code: string): Promise<{
   accessToken: string
@@ -84,20 +86,14 @@ export async function exchangeCodeForToken(code: string): Promise<{
     throw new Error('Instagram OAuth not configured')
   }
 
-  // Étape 1: Obtenir un short-lived token
-  const tokenResponse = await fetch('https://api.instagram.com/oauth/access_token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      grant_type: 'authorization_code',
-      redirect_uri: REDIRECT_URI,
-      code
-    })
-  })
+  // Étape 1: Obtenir un token Facebook
+  const tokenUrl = `https://graph.facebook.com/v21.0/oauth/access_token?` +
+    `client_id=${CLIENT_ID}&` +
+    `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
+    `client_secret=${CLIENT_SECRET}&` +
+    `code=${code}`
+
+  const tokenResponse = await fetch(tokenUrl)
 
   if (!tokenResponse.ok) {
     const error = await tokenResponse.text()
@@ -105,28 +101,47 @@ export async function exchangeCodeForToken(code: string): Promise<{
   }
 
   const tokenData = await tokenResponse.json()
+  const accessToken = tokenData.access_token
 
-  // Étape 2: Échanger contre un long-lived token (60 jours)
-  const longLivedResponse = await fetch(
-    `https://graph.instagram.com/access_token?` +
-    `grant_type=ig_exchange_token&` +
-    `client_secret=${CLIENT_SECRET}&` +
-    `access_token=${tokenData.access_token}`
+  // Étape 2: Obtenir les pages Facebook liées
+  const pagesResponse = await fetch(
+    `https://graph.facebook.com/v21.0/me/accounts?access_token=${accessToken}`
   )
 
-  if (!longLivedResponse.ok) {
-    // Utiliser le short-lived token si l'échange échoue
-    return {
-      accessToken: tokenData.access_token,
-      userId: tokenData.user_id.toString()
-    }
+  if (!pagesResponse.ok) {
+    throw new Error('Failed to get Facebook pages')
   }
 
-  const longLivedData = await longLivedResponse.json()
+  const pagesData = await pagesResponse.json()
+
+  if (!pagesData.data || pagesData.data.length === 0) {
+    throw new Error('No Facebook pages found. You need a Facebook Page linked to your Instagram account.')
+  }
+
+  // Prendre la première page (ou on pourrait laisser l'utilisateur choisir)
+  const page = pagesData.data[0]
+  const pageAccessToken = page.access_token
+
+  // Étape 3: Obtenir le compte Instagram Business lié à la page
+  const igAccountResponse = await fetch(
+    `https://graph.facebook.com/v21.0/${page.id}?fields=instagram_business_account&access_token=${pageAccessToken}`
+  )
+
+  if (!igAccountResponse.ok) {
+    throw new Error('Failed to get Instagram business account')
+  }
+
+  const igAccountData = await igAccountResponse.json()
+
+  if (!igAccountData.instagram_business_account) {
+    throw new Error('No Instagram Business account linked to this Facebook Page. Make sure your Instagram account is a Professional/Business account and is linked to your Facebook Page.')
+  }
+
+  const instagramAccountId = igAccountData.instagram_business_account.id
 
   return {
-    accessToken: longLivedData.access_token,
-    userId: tokenData.user_id.toString()
+    accessToken: pageAccessToken,
+    userId: instagramAccountId
   }
 }
 
@@ -157,15 +172,15 @@ export async function refreshToken(accessToken: string): Promise<{
 }
 
 /**
- * Récupère les informations du compte Instagram
+ * Récupère les informations du compte Instagram Business
  */
-export async function getAccountInfo(accessToken: string): Promise<{
+export async function getAccountInfo(accessToken: string, instagramAccountId: string): Promise<{
   id: string
   username: string
   accountType: string
 }> {
   const response = await fetch(
-    `https://graph.instagram.com/me?fields=id,username,account_type&access_token=${accessToken}`
+    `https://graph.facebook.com/v21.0/${instagramAccountId}?fields=id,username,account_type&access_token=${accessToken}`
   )
 
   if (!response.ok) {
@@ -178,7 +193,7 @@ export async function getAccountInfo(accessToken: string): Promise<{
   return {
     id: data.id,
     username: data.username,
-    accountType: data.account_type
+    accountType: data.account_type || 'BUSINESS'
   }
 }
 
